@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring IoT Nazhif & Althaf</title>
+    <!-- Import Firebase Library -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #f4f4f9; padding: 50px; }
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: inline-block; min-width: 300px; }
+        .temp { color: #e74c3c; font-size: 48px; font-weight: bold; }
+        .soil { color: #3498db; font-size: 48px; font-weight: bold; }
+        .status { font-style: italic; color: #7f8c8d; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>Monitoring Real-time</h2>
+        <hr>
+        <p>Temperatur</p>
+        <div class="temp"><span id="suhu">--</span>°C</div>
+        <p>Kelembapan Tanah</p>
+        <div class="soil"><span id="kelembapan">--</span>%</div>
+        <p>Status Sistem: <b id="status">--</b></p>
+    </div>
+
+    <script>
+        // KONFIGURASI FIREBASE (Ganti URL-nya dengan punya kamu)
+        const firebaseConfig = {
+            databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Ambil data dari folder /monitoring
+        db.ref("monitoring").on("value", (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                document.getElementById("suhu").innerText = data.suhu.toFixed(1);
+                document.getElementById("kelembapan").innerText = data.kelembapan;
+                document.getElementById("status").innerText = data.status;
+            }
+        });
+    </script>
+</body>
+</html>
