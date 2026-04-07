@@ -1,22 +1,20 @@
 // -- SETTING BATAS ALARM --
-    const BATAS_SUHU_PANAS = 35.0; // Contoh: Alarm bunyi jika > 35°C
-    const BATAS_KELEMBAPAN_KERING = 20; // Contoh: Alarm bunyi jika < 20%
+    const BATAS_SUHU_PANAS = 35.0; 
+    const BATAS_KELEMBAPAN_KERING = 20; 
 
-    // Fungsi untuk Bunyi Beep (Alarm)
     function playAlarmSound() {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        oscillator.type = 'sine'; 
-        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Nada tinggi
-        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-
-        oscillator.start();
-        oscillator.stop(audioCtx.currentTime + 0.5); // Bunyi selama 0.5 detik
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(880, audioCtx.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5);
+        } catch (e) { console.log("Audio Error: Klik START dulu agar suara aktif"); }
     }
 
     function fetchData() {
@@ -28,33 +26,27 @@
                 const k = data.kelembapan;
                 const waktu = new Date().toLocaleTimeString();
                 
-                // --- LOGIKA ALARM ---
                 let statusSistem = "NORMAL";
                 let isAlarm = false;
 
                 if (s > BATAS_SUHU_PANAS || k < BATAS_KELEMBAPAN_KERING) {
                     statusSistem = "!! BAHAYA !!";
                     isAlarm = true;
-                    playAlarmSound(); // Bunyi Bip!
+                    playAlarmSound(); 
                 }
 
-                // Update Warna Background Stat jika Alarm
                 const cardSuhu = document.querySelector('.bg-red');
-                const cardSoil = document.querySelector('.bg-blue');
-                
                 if (isAlarm) {
-                    cardSuhu.style.backgroundColor = "#ff0000"; // Merah terang
+                    cardSuhu.style.backgroundColor = "#ff0000"; 
                     cardSuhu.style.boxShadow = "0 0 20px #ff0000";
                 } else {
-                    cardSuhu.style.backgroundColor = "#e74c3c"; // Merah normal
+                    cardSuhu.style.backgroundColor = "#e74c3c"; 
                     cardSuhu.style.boxShadow = "none";
                 }
 
-                // Update UI
                 document.getElementById("txt-suhu").innerText = s;
                 document.getElementById("txt-kelembapan").innerText = k;
 
-                // Update Grafik
                 if (myChart.data.labels.length > 15) {
                     myChart.data.labels.shift();
                     myChart.data.datasets[0].data.shift();
@@ -65,10 +57,18 @@
                 myChart.data.datasets[1].data.push(k);
                 myChart.update();
 
-                // Update Tabel
+                // --- BAGIAN YANG TADI ERROR (SUDAH DIPERBAIKI) ---
                 const tableBody = document.getElementById("log-table-body");
-                const rowColor = isAlarm ? 'style="background-color: #ffeaea; font-weight: bold; color: red;"' : '';
-                const newRow = `<tr ${rowColor}><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${statusSistem}</td></tr>`;
+                const rowStyle = isAlarm ? 'style="background-color: #ffeaea; font-weight: bold; color: red;"' : '';
+                
+                // Pastikan ada tag <tr> dan <td> agar masuk ke dalam tabel
+                const newRow = `<tr ${rowStyle}>
+                                    <td>${waktu}</td>
+                                    <td>${s}</td>
+                                    <td>${k}</td>
+                                    <td>${statusSistem}</td>
+                                </tr>`;
+                                
                 tableBody.insertAdjacentHTML('afterbegin', newRow);
             }
         });
