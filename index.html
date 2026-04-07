@@ -1,133 +1,75 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IoT Dashboard Pro - Nazhif & Althaf</title>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <!-- Tambahan Library Grafik -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; text-align: center; }
-        .container { max-width: 1000px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .grid { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
-        .stat { flex: 1; padding: 15px; border-radius: 10px; color: white; }
-        .bg-red { background: #e74c3c; } .bg-blue { background: #3498db; }
-        h1, h2 { margin: 5px 0; }
-        
-        /* Area Grafik */
-        canvas { max-height: 300px; margin-top: 20px; }
+// -- SETTING BATAS ALARM --
+    const BATAS_SUHU_PANAS = 35.0; // Contoh: Alarm bunyi jika > 35°C
+    const BATAS_KELEMBAPAN_KERING = 20; // Contoh: Alarm bunyi jika < 20%
 
-        /* Tabel Log */
-        .table-wrapper { max-height: 300px; overflow-y: auto; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #2c3e50; color: white; position: sticky; top: 0; padding: 12px; }
-        td { padding: 10px; border-bottom: 1px solid #eee; font-size: 14px; }
-        tr:nth-child(even) { background: #fafafa; }
-    </style>
-</head>
-<body>
+    // Fungsi untuk Bunyi Beep (Alarm)
+    function playAlarmSound() {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
 
-<div class="container">
-    <div class="card">
-        <h2>Monitoring Real-Time & Riwayat</h2>
-        <p>Project Nazhif Imaman Zaini & Althaf</p>
-        <div class="grid">
-            <div class="stat bg-red">
-                <p>Temperatur</p>
-                <h1><span id="txt-suhu">--</span>°C</h1>
-            </div>
-            <div class="stat bg-blue">
-                <p>Kelembapan</p>
-                <h1><span id="txt-kelembapan">--</span>%</h1>
-            </div>
-        </div>
-        
-        <!-- TEMPAT GRAFIK -->
-        <canvas id="iotChart"></canvas>
-    </div>
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
 
-    <!-- TABEL LOG RIWAYAT -->
-    <div class="card">
-        <h3>Log Data (Dari Awal Buka Web)</h3>
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Waktu</th>
-                        <th>Suhu (°C)</th>
-                        <th>Kelembapan (%)</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="log-table-body">
-                    <!-- Data masuk ke sini -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
+        oscillator.type = 'sine'; 
+        oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // Nada tinggi
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
 
-<script>
-    const firebaseConfig = {
-        databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.5); // Bunyi selama 0.5 detik
+    }
 
-    // -- SETUP GRAFIK --
-    const ctx = document.getElementById('iotChart').getContext('2d');
-    const myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [], // Waktu
-            datasets: [
-                { label: 'Suhu (°C)', data: [], borderColor: '#e74c3c', tension: 0.3, fill: false },
-                { label: 'Kelembapan (%)', data: [], borderColor: '#3498db', tension: 0.3, fill: false }
-            ]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: false } } }
-    });
+    function fetchData() {
+        if (!isMonitoring) return;
+        db.ref("monitoring").once("value").then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const s = parseFloat(data.suhu).toFixed(1);
+                const k = data.kelembapan;
+                const waktu = new Date().toLocaleTimeString();
+                
+                // --- LOGIKA ALARM ---
+                let statusSistem = "NORMAL";
+                let isAlarm = false;
 
-    // -- AMBIL DATA --
-    db.ref("monitoring").on("value", (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            const s = parseFloat(data.suhu).toFixed(1);
-            const k = data.kelembapan;
-            const st = data.status || "NORMAL";
-            const waktu = new Date().toLocaleTimeString();
+                if (s > BATAS_SUHU_PANAS || k < BATAS_KELEMBAPAN_KERING) {
+                    statusSistem = "!! BAHAYA !!";
+                    isAlarm = true;
+                    playAlarmSound(); // Bunyi Bip!
+                }
 
-            // 1. Update Angka Besar
-            document.getElementById("txt-suhu").innerText = s;
-            document.getElementById("txt-kelembapan").innerText = k;
+                // Update Warna Background Stat jika Alarm
+                const cardSuhu = document.querySelector('.bg-red');
+                const cardSoil = document.querySelector('.bg-blue');
+                
+                if (isAlarm) {
+                    cardSuhu.style.backgroundColor = "#ff0000"; // Merah terang
+                    cardSuhu.style.boxShadow = "0 0 20px #ff0000";
+                } else {
+                    cardSuhu.style.backgroundColor = "#e74c3c"; // Merah normal
+                    cardSuhu.style.boxShadow = "none";
+                }
 
-            // 2. Update Grafik (Maksimal 10 titik terakhir biar ga sesak)
-            if (myChart.data.labels.length > 10) {
-                myChart.data.labels.shift();
-                myChart.data.datasets[0].data.shift();
-                myChart.data.datasets[1].data.shift();
+                // Update UI
+                document.getElementById("txt-suhu").innerText = s;
+                document.getElementById("txt-kelembapan").innerText = k;
+
+                // Update Grafik
+                if (myChart.data.labels.length > 15) {
+                    myChart.data.labels.shift();
+                    myChart.data.datasets[0].data.shift();
+                    myChart.data.datasets[1].data.shift();
+                }
+                myChart.data.labels.push(waktu);
+                myChart.data.datasets[0].data.push(s);
+                myChart.data.datasets[1].data.push(k);
+                myChart.update();
+
+                // Update Tabel
+                const tableBody = document.getElementById("log-table-body");
+                const rowColor = isAlarm ? 'style="background-color: #ffeaea; font-weight: bold; color: red;"' : '';
+                const newRow = `<tr ${rowColor}><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${statusSistem}</td></tr>`;
+                tableBody.insertAdjacentHTML('afterbegin', newRow);
             }
-            myChart.data.labels.push(waktu);
-            myChart.data.datasets[0].data.push(s);
-            myChart.data.datasets[1].data.push(k);
-            myChart.update();
-
-            // 3. Update Tabel Log (Tambah ke paling atas)
-            const tableBody = document.getElementById("log-table-body");
-            const newRow = `<tr>
-                <td>${waktu}</td>
-                <td>${s}</td>
-                <td>${k}</td>
-                <td>${st}</td>
-            </tr>`;
-            tableBody.insertAdjacentHTML('afterbegin', newRow);
-        }
-    });
-</script>
-
-</body>
-</html>
+        });
+    }
