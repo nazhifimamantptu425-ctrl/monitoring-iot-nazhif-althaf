@@ -13,16 +13,15 @@
         .container { max-width: 1000px; margin: auto; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
         .grid { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
-        .stat { flex: 1; padding: 15px; border-radius: 10px; color: white; transition: 0.3s; }
-        .bg-red { background: #e74c3c; } 
-        .bg-blue { background: #3498db; }
+        .stat { flex: 1; padding: 15px; border-radius: 10px; color: white; }
+        .bg-red { background: #e74c3c; } .bg-blue { background: #3498db; }
         .controls { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         input[type="number"] { width: 60px; padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
         button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
         .btn-start { background-color: #2ecc71; color: white; }
         .btn-stop { background-color: #e74c3c; color: white; }
         canvas { max-height: 300px; margin-top: 20px; }
-        .table-wrapper { max-height: 400px; overflow-y: auto; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .table-wrapper { max-height: 300px; overflow-y: auto; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; }
         th { background: #2c3e50; color: white; position: sticky; top: 0; padding: 12px; }
         td { padding: 10px; border-bottom: 1px solid #eee; }
@@ -34,7 +33,7 @@
     <div class="card">
         <h2>Monitoring Real-Time & Riwayat</h2>
         <p>Project Nazhif Imaman Zaini & Althaf</p>
-        <p style="font-size: 0.9em; color: #555;">Sensor: <b>DS18B20</b> & <b>Soil Moisture</b></p>
+        <p style="font-size: 0.9em; color: #555;">Sensor: <b>DS18B20</b> (Suhu) & <b>Soil Moisture</b> (Kelembapan)</p>
         
         <div class="controls">
             <label>Update Interval (Detik):</label>
@@ -44,11 +43,11 @@
         </div>
 
         <div class="grid">
-            <div id="card-suhu" class="stat bg-red">
+            <div class="stat bg-red">
                 <p>Temperatur (DS18B20)</p>
                 <h1><span id="txt-suhu">--</span>°C</h1>
             </div>
-            <div id="card-soil" class="stat bg-blue">
+            <div class="stat bg-blue">
                 <p>Kelembapan Tanah</p>
                 <h1><span id="txt-kelembapan">--</span>%</h1>
             </div>
@@ -75,20 +74,76 @@
 </div>
 
 <script>
-    // 1. KONFIGURASI FIREBASE
     const firebaseConfig = {
         databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 2. SETTING ALARM
-    const BATAS_SUHU_PANAS = 35.0; 
-    const BATAS_KELEMBAPAN_KERING = 20; 
-
     let isMonitoring = true;
     let updateInterval = null;
 
-    // 3. SETUP GRAFIK
+    // -- SETUP GRAFIK --
     const ctx = document.getElementById('iotChart').getContext('2d');
     const myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                { label: 'Suhu (°C)', data: [], borderColor: '#e74c3c', tension: 0.3, fill: false },
+                { label: 'Kelembapan (%)', data: [], borderColor: '#3498db', tension: 0.3, fill: false }
+            ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: false } } }
+    });
+
+    function fetchData() {
+        if (!isMonitoring) return;
+        db.ref("monitoring").once("value").then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const s = parseFloat(data.suhu).toFixed(1);
+                const k = data.kelembapan;
+                const st = data.status || "NORMAL";
+                const waktu = new Date().toLocaleTimeString();
+
+                document.getElementById("txt-suhu").innerText = s;
+                document.getElementById("txt-kelembapan").innerText = k;
+
+                if (myChart.data.labels.length > 15) {
+                    myChart.data.labels.shift();
+                    myChart.data.datasets[0].data.shift();
+                    myChart.data.datasets[1].data.shift();
+                }
+                myChart.data.labels.push(waktu);
+                myChart.data.datasets[0].data.push(s);
+                myChart.data.datasets[1].data.push(k);
+                myChart.update();
+
+                const tableBody = document.getElementById("log-table-body");
+                const newRow = `<tr><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${st}</td></tr>`;
+                tableBody.insertAdjacentHTML('afterbegin', newRow);
+            }
+        });
+    }
+
+    function startMonitoring() {
+        const intervalSec = document.getElementById("intervalInput").value * 1000;
+        isMonitoring = true;
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(fetchData, intervalSec);
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
+    }
+
+    function stopMonitoring() {
+        isMonitoring = false;
+        clearInterval(updateInterval);
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
+    }
+
+    startMonitoring();
+</script>
+</body>
+</html>
