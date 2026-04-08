@@ -5,8 +5,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let isMonitoring = false; // Default false dulu
-    let updateInterval = null;
+    // Variabel status monitoring (sinkron dengan Firebase)
+    let isMonitoringActive = false; 
 
     // -- SETUP GRAFIK --
     const ctx = document.getElementById('iotChart').getContext('2d');
@@ -22,8 +22,8 @@
         options: { responsive: true, scales: { y: { beginAtZero: false } } }
     });
 
-    // 1. FUNGSI AMBIL DATA (HANYA UNTUK TAMPILAN)
-    function updateDisplay(snapshot) {
+    // 1. LISTENER UTAMA (Mendengar data dari ESP32)
+    db.ref("monitoring").on("value", (snapshot) => {
         const data = snapshot.val();
         if (data) {
             const s = parseFloat(data.suhu).toFixed(1);
@@ -31,11 +31,13 @@
             const st = data.status || "NORMAL";
             const waktu = new Date().toLocaleTimeString();
 
+            // --- BAGIAN INI PASTI MUNCUL (Data Terakhir) ---
             document.getElementById("txt-suhu").innerText = s;
             document.getElementById("txt-kelembapan").innerText = k;
 
-            // Update Grafik & Tabel hanya jika isMonitoring AKTIF
-            if (isMonitoring) {
+            // --- BAGIAN INI HANYA JALAN KALAU STATUS "START" ---
+            if (isMonitoringActive) {
+                // Update Grafik
                 if (myChart.data.labels.length > 15) {
                     myChart.data.labels.shift();
                     myChart.data.datasets[0].data.shift();
@@ -46,46 +48,33 @@
                 myChart.data.datasets[1].data.push(k);
                 myChart.update();
 
+                // Tambah ke Tabel
                 const tableBody = document.getElementById("log-table-body");
                 const newRow = `<tr><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${st}</td></tr>`;
                 tableBody.insertAdjacentHTML('afterbegin', newRow);
             }
         }
-    }
+    });
 
-    // 2. SINKRONISASI STATUS RUNNING DARI FIREBASE
+    // 2. SINKRONISASI TOMBOL & STATUS DARI FIREBASE
     db.ref("pengaturan/running").on("value", (snapshot) => {
-        isMonitoring = snapshot.val();
+        isMonitoringActive = snapshot.val(); // Ambil status true/false dari Firebase
+        
         const startBtn = document.getElementById("startBtn");
         const stopBtn = document.getElementById("stopBtn");
         
-        if (isMonitoring) {
+        if (isMonitoringActive) {
             startBtn.disabled = true;
             stopBtn.disabled = false;
-            // Jalankan interval jika monitoring aktif
-            runInterval();
         } else {
             startBtn.disabled = false;
             stopBtn.disabled = true;
-            if (updateInterval) clearInterval(updateInterval);
         }
     });
 
-    // 3. AMBIL DATA TERAKHIR (REAL-TIME LISTENER)
-    // Supaya pas buka web langsung muncul data terakhir meski STOP
-    db.ref("monitoring").on("value", (snapshot) => {
-        updateDisplay(snapshot);
-    });
-
-    function runInterval() {
-        if (updateInterval) clearInterval(updateInterval);
-        const intervalSec = document.getElementById("intervalInput").value * 1000;
-        // Kita tidak fetchData lagi, karena sudah ada .on("value") di atas
-        // Interval ini hanya untuk trigger update grafik jika diperlukan
-    }
-
+    // 3. FUNGSI TOMBOL
     function startMonitoring() {
-        const intervalVal = document.getElementById("intervalInput").value;
+        const intervalVal = document.getElementById("intervalInput").value || 2; 
         db.ref("pengaturan/running").set(true);
         db.ref("pengaturan/interval").set(parseInt(intervalVal));
     }
@@ -94,7 +83,7 @@
         db.ref("pengaturan/running").set(false);
     }
 
-    // Interval Input dikosongkan saat load pertama kali
+    // Reset input saat halaman dibuka
     window.onload = function() {
         document.getElementById("intervalInput").value = ""; 
     };
