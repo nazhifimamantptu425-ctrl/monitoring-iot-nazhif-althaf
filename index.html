@@ -16,6 +16,7 @@
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
         tr { background: rgba(30, 41, 59, 0.5); transition: 0.2s; }
         tr:hover { background: rgba(99, 102, 241, 0.2); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -26,7 +27,6 @@
             <p class="text-gray-400 text-sm italic">"Security is a process, not a product."</p>
         </div>
         <div class="flex items-center gap-4">
-            <!-- Tombol Download Baru -->
             <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition">
                 <i class="fas fa-file-download"></i> DOWNLOAD DATA
             </button>
@@ -42,7 +42,7 @@
         </div>
     </div>
 
-    <!-- Main Stats (Tetap sama) -->
+    <!-- Main Stats -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div class="glass-card p-6 flex items-center gap-4">
             <div class="p-4 bg-red-500/20 rounded-xl"><i class="fas fa-thermometer-half text-red-500 text-2xl"></i></div>
@@ -62,7 +62,7 @@
                 <input id="intervalInput" type="number" placeholder="Set Interval (Sec)" class="bg-slate-800 border-none rounded-lg p-2 text-sm text-white outline-none">
                 <div class="grid grid-cols-2 gap-2">
                     <button id="startBtn" onclick="startMonitoring()" class="btn-gradient p-2 rounded-lg text-sm font-bold">START</button>
-                    <button id="stopBtn" onclick="stopMonitoring()" class="bg-red-600 p-2 rounded-lg text-sm font-bold disabled:opacity-50">STOP</button>
+                    <button id="stopBtn" onclick="stopMonitoring()" class="bg-red-600 p-2 rounded-lg text-sm font-bold">STOP</button>
                 </div>
             </div>
         </div>
@@ -105,13 +105,16 @@
     </div>
 
     <script>
+        // --- KONFIGURASI FIREBASE ---
         const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
         let isRunning = false;
-        let logData = []; // Array untuk menampung data CSV
+        let logData = []; 
+        let pollingTimer = null;
 
+        // --- INISIALISASI CHART ---
         const ctx = document.getElementById('iotChart').getContext('2d');
         const myChart = new Chart(ctx, {
             type: 'line',
@@ -122,40 +125,84 @@
                     { label: 'Kelembapan', data: [], borderColor: '#60a5fa', tension: 0.4, fill: false }
                 ]
             },
-            options: { scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
         });
 
-        function updateUI(snapshot) {
-            const data = snapshot.val();
-            if (data && isRunning) {
-                const s = parseFloat(data.suhu || 0).toFixed(1);
-                const k = data.kelembapan || 0;
-                const st = data.status || "NORMAL";
-                const waktu = new Date().toLocaleString();
+        // --- LOGIKA UTAMA AMBIL DATA (POLLING) ---
+        function fetchData() {
+            if (!isRunning) return;
 
-                document.getElementById("txt-suhu").innerText = s;
-                document.getElementById("txt-kelembapan").innerText = k;
-                document.getElementById("txt-status").innerText = st;
-                document.getElementById("txt-status").className = st === "NORMAL" ? "text-xl font-bold text-green-400" : "text-xl font-bold text-red-500 animate-pulse";
+            db.ref("monitoring").once("value").then((snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    const s = parseFloat(data.suhu || 0).toFixed(1);
+                    const k = data.kelembapan || 0;
+                    const st = data.status || "NORMAL";
+                    const waktuJam = new Date().toLocaleTimeString('id-ID');
+                    const waktuLengkap = new Date().toLocaleString('id-ID');
 
-                // Tambahkan ke Array Download
-                logData.push({ waktu, s, k, st });
+                    // 1. Update Card Stats
+                    document.getElementById("txt-suhu").innerText = s;
+                    document.getElementById("txt-kelembapan").innerText = k;
+                    document.getElementById("txt-status").innerText = st;
+                    document.getElementById("txt-status").className = st === "NORMAL" ? "text-xl font-bold text-green-400" : "text-xl font-bold text-red-500 animate-pulse";
 
-                // Update Chart
-                if (myChart.data.labels.length > 15) {
-                    myChart.data.labels.shift();
-                    myChart.data.datasets[0].data.shift();
-                    myChart.data.datasets[1].data.shift();
+                    // 2. Simpan Data ke Array (untuk CSV)
+                    logData.push({ waktu: waktuLengkap, s, k, st });
+
+                    // 3. Update Chart
+                    if (myChart.data.labels.length > 15) {
+                        myChart.data.labels.shift();
+                        myChart.data.datasets[0].data.shift();
+                        myChart.data.datasets[1].data.shift();
+                    }
+                    myChart.data.labels.push(waktuJam);
+                    myChart.data.datasets[0].data.push(s);
+                    myChart.data.datasets[1].data.push(k);
+                    myChart.update('none');
+
+                    // 4. Update Tabel
+                    const newRow = `<tr>
+                        <td class="p-4 text-gray-400">${waktuLengkap}</td>
+                        <td class="p-4 font-bold text-red-400">${s}°C</td>
+                        <td class="p-4 font-bold text-blue-400">${k}%</td>
+                        <td class="p-4"><span class="status-badge ${st==='NORMAL'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${st}</span></td>
+                    </tr>`;
+                    document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
-                myChart.data.labels.push(new Date().toLocaleTimeString());
-                myChart.data.datasets[0].data.push(s);
-                myChart.data.datasets[1].data.push(k);
-                myChart.update();
+            });
+        }
 
-                // Update Table
-                const newRow = `<tr><td class="p-4 text-gray-400">${waktu}</td><td class="p-4 font-bold text-red-400">${s}°C</td><td class="p-4 font-bold text-blue-400">${k}%</td><td class="p-4"><span class="status-badge ${st==='NORMAL'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${st}</span></td></tr>`;
-                document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
+        // --- SYNC DENGAN PENGATURAN FIREBASE ---
+        db.ref("pengaturan").on("value", (snap) => {
+            const settings = snap.val();
+            if(!settings) return;
+
+            isRunning = settings.running;
+            const intervalMs = (settings.interval || 5) * 1000;
+
+            // UI Feedback
+            document.getElementById("startBtn").disabled = isRunning;
+            document.getElementById("stopBtn").disabled = !isRunning;
+            document.getElementById("conn-stat").innerText = isRunning ? "RUNNING" : "STANDBY";
+            document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
+
+            // Atur ulang timer setiap ada perubahan status/interval
+            if (pollingTimer) clearInterval(pollingTimer);
+            if (isRunning) {
+                fetchData(); // Ambil data segera saat start
+                pollingTimer = setInterval(fetchData, intervalMs);
             }
+        });
+
+        // --- FUNGSI CONTROL ---
+        function startMonitoring() {
+            const val = document.getElementById("intervalInput").value || 5;
+            db.ref("pengaturan").update({ running: true, interval: parseInt(val) });
+        }
+
+        function stopMonitoring() { 
+            db.ref("pengaturan/running").set(false); 
         }
 
         function downloadCSV() {
@@ -173,23 +220,8 @@
             link.setAttribute("download", "SISPENG_Data_Log.csv");
             document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
         }
-
-        db.ref("pengaturan/running").on("value", (snap) => {
-            isRunning = snap.val();
-            document.getElementById("startBtn").disabled = isRunning;
-            document.getElementById("stopBtn").disabled = !isRunning;
-            document.getElementById("conn-stat").innerText = isRunning ? "RUNNING" : "STANDBY";
-            document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
-        });
-
-        db.ref("monitoring").on("value", (snapshot) => { updateUI(snapshot); });
-
-        function startMonitoring() {
-            const val = document.getElementById("intervalInput").value || 5;
-            db.ref("pengaturan").update({ running: true, interval: parseInt(val) });
-        }
-        function stopMonitoring() { db.ref("pengaturan/running").set(false); }
     </script>
 </body>
 </html>
