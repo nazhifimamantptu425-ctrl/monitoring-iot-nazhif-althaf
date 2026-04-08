@@ -1,96 +1,178 @@
-<script>
-    // 1. KONFIGURASI FIREBASE
-    const firebaseConfig = {
-        databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VertexGuard | IoT Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #0f111a; color: #ffffff; font-family: 'Inter', sans-serif; }
+        .glass-card { background: rgba(25, 28, 41, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; }
+        .accent-purple { color: #a855f7; }
+        .bg-purple-main { background: #6366f1; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
+        .btn-gradient { background: linear-gradient(90deg, #6366f1 0%, #a855f7 100%); transition: 0.3s; }
+        .btn-gradient:disabled { background: #334155; opacity: 0.5; }
+        table { border-collapse: separate; border-spacing: 0 8px; }
+        tr { background: rgba(30, 41, 59, 0.5); }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+        <div>
+            <h1 class="text-3xl font-bold italic text-purple-400">VertexGuard <span class="text-white font-light text-sm ml-2">IoT System</span></h1>
+            <p class="text-gray-400 text-sm italic">"Security is a process, not a product."</p>
+        </div>
+        <div class="flex items-center gap-4 glass-card p-3">
+            <div class="text-right">
+                <p class="text-xs text-gray-400">Welcome,</p>
+                <p class="font-bold">Nazhif & Althaf</p>
+            </div>
+            <div class="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                <i class="fas fa-user text-white"></i>
+            </div>
+        </div>
+    </div>
 
-    // Variabel Global
-    let isRunning = false;
+    <!-- Main Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="glass-card p-6 flex items-center gap-4">
+            <div class="p-4 bg-red-500/20 rounded-xl"><i class="fas fa-thermometer-half text-red-500 text-2xl"></i></div>
+            <div><p class="text-gray-400 text-sm">Temperature</p><h2 id="txt-suhu" class="text-3xl font-bold">0.0</h2><p class="text-xs text-red-400">°Celsius</p></div>
+        </div>
+        <div class="glass-card p-6 flex items-center gap-4">
+            <div class="p-4 bg-blue-500/20 rounded-xl"><i class="fas fa-tint text-blue-500 text-2xl"></i></div>
+            <div><p class="text-gray-400 text-sm">Soil Moisture</p><h2 id="txt-kelembapan" class="text-3xl font-bold">0</h2><p class="text-xs text-blue-400">% Percentage</p></div>
+        </div>
+        <div class="glass-card p-6 flex items-center gap-4">
+            <div class="p-4 bg-purple-500/20 rounded-xl"><i class="fas fa-shield-alt text-purple-500 text-2xl"></i></div>
+            <div><p class="text-gray-400 text-sm">System Status</p><h2 id="txt-status" class="text-xl font-bold text-green-400">NORMAL</h2></div>
+        </div>
+        <div class="glass-card p-6">
+            <p class="text-gray-400 text-sm mb-2">Control Panel</p>
+            <div class="flex flex-col gap-2">
+                <input id="intervalInput" type="number" placeholder="Set Interval (Sec)" class="bg-slate-800 border-none rounded-lg p-2 text-sm focus:ring-2 ring-purple-500 outline-none">
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="startBtn" onclick="startMonitoring()" class="btn-gradient p-2 rounded-lg text-sm font-bold">START</button>
+                    <button id="stopBtn" onclick="stopMonitoring()" class="bg-red-600 p-2 rounded-lg text-sm font-bold disabled:opacity-50">STOP</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    // -- SETUP GRAFIK --
-    const ctx = document.getElementById('iotChart').getContext('2d');
-    const myChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                { label: 'Suhu (°C)', data: [], borderColor: '#e74c3c', tension: 0.3, fill: false },
-                { label: 'Kelembapan (%)', data: [], borderColor: '#3498db', tension: 0.3, fill: false }
-            ]
-        },
-        options: { responsive: true, scales: { y: { beginAtZero: false } } }
-    });
+    <!-- Chart Section -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div class="md:col-span-2 glass-card p-6">
+            <h3 class="font-bold mb-4 flex justify-between">Real-time Summary <span class="text-xs text-gray-400">Live Chart</span></h3>
+            <canvas id="iotChart" height="150"></canvas>
+        </div>
+        <div class="glass-card p-6">
+            <h3 class="font-bold mb-4 text-center">Device Info</h3>
+            <div class="flex justify-center mb-4">
+                <div class="relative w-32 h-32 rounded-full border-8 border-purple-500/20 flex items-center justify-center">
+                    <div class="text-center">
+                        <p class="text-xs text-gray-400">Connectivity</p>
+                        <p id="conn-stat" class="text-green-400 font-bold">ONLINE</p>
+                    </div>
+                </div>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between text-gray-400"><span>Hardware:</span><span class="text-white">ESP32 DevKit</span></div>
+                <div class="flex justify-between text-gray-400"><span>Storage:</span><span class="text-white">SD Card Syncing</span></div>
+                <div class="flex justify-between text-gray-400"><span>Cloud:</span><span class="text-white">Firebase RTDB</span></div>
+            </div>
+        </div>
+    </div>
 
-    // 2. FUNGSI UPDATE TAMPILAN (Dipanggil setiap ada data baru)
-    function updateUI(snapshot) {
-        const data = snapshot.val();
-        if (data) {
-            const s = parseFloat(data.suhu || 0).toFixed(1);
-            const k = data.kelembapan || 0;
-            const st = data.status || "NORMAL";
-            const waktu = new Date().toLocaleTimeString();
+    <!-- Table Section -->
+    <div class="glass-card p-6 overflow-hidden">
+        <h3 class="font-bold mb-4 italic text-purple-400">Data Logging History</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="text-gray-400 text-xs uppercase">
+                    <tr>
+                        <th class="p-4">Timestamp</th>
+                        <th class="p-4">Temperature</th>
+                        <th class="p-4">Moisture</th>
+                        <th class="p-4">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="log-table-body" class="text-sm">
+                    <!-- Data masuk di sini -->
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-            // Tampilkan Angka Terakhir (PASTI MUNCUL MESKI STOP)
-            document.getElementById("txt-suhu").innerText = s;
-            document.getElementById("txt-kelembapan").innerText = k;
+    <script>
+        const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-            // Update Grafik & Tabel HANYA JIKA STATUS DI FIREBASE = RUNNING
-            if (isRunning) {
-                if (myChart.data.labels.length > 15) {
-                    myChart.data.labels.shift();
-                    myChart.data.datasets[0].data.shift();
-                    myChart.data.datasets[1].data.shift();
+        let isRunning = false;
+        const ctx = document.getElementById('iotChart').getContext('2d');
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Suhu', data: [], borderColor: '#f87171', tension: 0.4, fill: true, backgroundColor: 'rgba(248, 113, 113, 0.1)' },
+                    { label: 'Kelembapan', data: [], borderColor: '#60a5fa', tension: 0.4, fill: true, backgroundColor: 'rgba(96, 165, 250, 0.1)' }
+                ]
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
+        });
+
+        function updateUI(snapshot) {
+            const data = snapshot.val();
+            if (data) {
+                const s = parseFloat(data.suhu || 0).toFixed(1);
+                const k = data.kelembapan || 0;
+                const st = data.status || "NORMAL";
+                const waktu = new Date().toLocaleTimeString();
+
+                document.getElementById("txt-suhu").innerText = s;
+                document.getElementById("txt-kelembapan").innerText = k;
+                document.getElementById("txt-status").innerText = st;
+                document.getElementById("txt-status").className = st === "NORMAL" ? "text-xl font-bold text-green-400" : "text-xl font-bold text-red-500 animate-pulse";
+
+                if (isRunning) {
+                    if (myChart.data.labels.length > 10) {
+                        myChart.data.labels.shift();
+                        myChart.data.datasets[0].data.shift();
+                        myChart.data.datasets[1].data.shift();
+                    }
+                    myChart.data.labels.push(waktu);
+                    myChart.data.datasets[0].data.push(s);
+                    myChart.data.datasets[1].data.push(k);
+                    myChart.update();
+
+                    const newRow = `<tr><td class="p-4 text-gray-400">${waktu}</td><td class="p-4 font-bold text-red-400">${s}°C</td><td class="p-4 font-bold text-blue-400">${k}%</td><td class="p-4"><span class="status-badge ${st==='NORMAL'?'bg-green-500/20 text-green-400':'bg-red-500/20 text-red-400'}">${st}</span></td></tr>`;
+                    document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
-                myChart.data.labels.push(waktu);
-                myChart.data.datasets[0].data.push(s);
-                myChart.data.datasets[1].data.push(k);
-                myChart.update();
-
-                const tableBody = document.getElementById("log-table-body");
-                const newRow = `<tr><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${st}</td></tr>`;
-                tableBody.insertAdjacentHTML('afterbegin', newRow);
             }
         }
-    }
 
-    // 3. SINKRONISASI STATUS (START/STOP) DARI FIREBASE
-    db.ref("pengaturan/running").on("value", (snapshot) => {
-        isRunning = snapshot.val(); // Ambil status asli dari database
-        const startBtn = document.getElementById("startBtn");
-        const stopBtn = document.getElementById("stopBtn");
+        db.ref("pengaturan/running").on("value", (snap) => {
+            isRunning = snap.val();
+            document.getElementById("startBtn").disabled = isRunning;
+            document.getElementById("stopBtn").disabled = !isRunning;
+            document.getElementById("conn-stat").innerText = isRunning ? "RUNNING" : "STANDBY";
+            document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
+        });
 
-        if (isRunning) {
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-        } else {
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
+        db.ref("monitoring").on("value", (snapshot) => { updateUI(snapshot); });
+
+        function startMonitoring() {
+            const val = document.getElementById("intervalInput").value || 2;
+            db.ref("pengaturan").update({ running: true, interval: parseInt(val) });
         }
-    });
-
-    // 4. MENDENGARKAN DATA MONITORING SECARA REAL-TIME
-    // Ini yang bikin data terakhir langsung muncul pas web dibuka
-    db.ref("monitoring").on("value", (snapshot) => {
-        updateUI(snapshot);
-    });
-
-    // 5. FUNGSI TOMBOL (Update ke Firebase, bukan ke Browser sendiri)
-    function startMonitoring() {
-        const inputVal = document.getElementById("intervalInput").value;
-        const interval = inputVal ? parseInt(inputVal) : 2; // Default 2 jika kosong
-        
-        db.ref("pengaturan/running").set(true);
-        db.ref("pengaturan/interval").set(interval);
-    }
-
-    function stopMonitoring() {
-        db.ref("pengaturan/running").set(false);
-    }
-
-    // Paksa input interval kosong saat web baru dibuka
-    window.onload = function() {
-        document.getElementById("intervalInput").value = "";
-    };
-</script>
+        function stopMonitoring() { db.ref("pengaturan/running").set(false); }
+    </script>
+</body>
+</html>
