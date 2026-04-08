@@ -1,3 +1,78 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Dashboard Pro - Nazhif & Althaf</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; text-align: center; }
+        .container { max-width: 1000px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .grid { display: flex; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .stat { flex: 1; padding: 15px; border-radius: 10px; color: white; }
+        .bg-red { background: #e74c3c; } .bg-blue { background: #3498db; }
+        .controls { background: #fff; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: center; align-items: center; gap: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input[type="number"] { width: 60px; padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .btn-start { background-color: #2ecc71; color: white; }
+        .btn-stop { background-color: #e74c3c; color: white; }
+        canvas { max-height: 300px; margin-top: 20px; }
+        .table-wrapper { max-height: 300px; overflow-y: auto; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #2c3e50; color: white; position: sticky; top: 0; padding: 12px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <h2>Monitoring Real-Time & Riwayat</h2>
+        <p>Project Nazhif Imaman Zaini & Althaf</p>
+        <p style="font-size: 0.9em; color: #555;">Sensor: <b>DS18B20</b> (Suhu) & <b>Soil Moisture</b> (Kelembapan)</p>
+        
+        <div class="controls">
+            <label>Update Interval (Detik):</label>
+            <input type="number" id="intervalInput" value="2" min="1">
+            <button id="startBtn" class="btn-start" onclick="startMonitoring()" disabled>START</button>
+            <button id="stopBtn" class="btn-stop" onclick="stopMonitoring()">STOP</button>
+        </div>
+
+        <div class="grid">
+            <div class="stat bg-red">
+                <p>Temperatur (DS18B20)</p>
+                <h1><span id="txt-suhu">--</span>°C</h1>
+            </div>
+            <div class="stat bg-blue">
+                <p>Kelembapan Tanah</p>
+                <h1><span id="txt-kelembapan">--</span>%</h1>
+            </div>
+        </div>
+        <canvas id="iotChart"></canvas>
+    </div>
+
+    <div class="card">
+        <h3>Log Data Real-Time</h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Waktu</th>
+                        <th>Suhu (°C)</th>
+                        <th>Kelembapan (%)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="log-table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
 <script>
     const firebaseConfig = {
         databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/"
@@ -5,8 +80,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // Variabel status monitoring (sinkron dengan Firebase)
-    let isMonitoringActive = false; 
+    let isMonitoring = true;
+    let updateInterval = null;
 
     // -- SETUP GRAFIK --
     const ctx = document.getElementById('iotChart').getContext('2d');
@@ -22,22 +97,19 @@
         options: { responsive: true, scales: { y: { beginAtZero: false } } }
     });
 
-    // 1. LISTENER UTAMA (Mendengar data dari ESP32)
-    db.ref("monitoring").on("value", (snapshot) => {
-        const data = snapshot.val();
-        if (data) {
-            const s = parseFloat(data.suhu).toFixed(1);
-            const k = data.kelembapan;
-            const st = data.status || "NORMAL";
-            const waktu = new Date().toLocaleTimeString();
+    function fetchData() {
+        if (!isMonitoring) return;
+        db.ref("monitoring").once("value").then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const s = parseFloat(data.suhu).toFixed(1);
+                const k = data.kelembapan;
+                const st = data.status || "NORMAL";
+                const waktu = new Date().toLocaleTimeString();
 
-            // --- BAGIAN INI PASTI MUNCUL (Data Terakhir) ---
-            document.getElementById("txt-suhu").innerText = s;
-            document.getElementById("txt-kelembapan").innerText = k;
+                document.getElementById("txt-suhu").innerText = s;
+                document.getElementById("txt-kelembapan").innerText = k;
 
-            // --- BAGIAN INI HANYA JALAN KALAU STATUS "START" ---
-            if (isMonitoringActive) {
-                // Update Grafik
                 if (myChart.data.labels.length > 15) {
                     myChart.data.labels.shift();
                     myChart.data.datasets[0].data.shift();
@@ -48,43 +120,30 @@
                 myChart.data.datasets[1].data.push(k);
                 myChart.update();
 
-                // Tambah ke Tabel
                 const tableBody = document.getElementById("log-table-body");
                 const newRow = `<tr><td>${waktu}</td><td>${s}</td><td>${k}</td><td>${st}</td></tr>`;
                 tableBody.insertAdjacentHTML('afterbegin', newRow);
             }
-        }
-    });
+        });
+    }
 
-    // 2. SINKRONISASI TOMBOL & STATUS DARI FIREBASE
-    db.ref("pengaturan/running").on("value", (snapshot) => {
-        isMonitoringActive = snapshot.val(); // Ambil status true/false dari Firebase
-        
-        const startBtn = document.getElementById("startBtn");
-        const stopBtn = document.getElementById("stopBtn");
-        
-        if (isMonitoringActive) {
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-        } else {
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-        }
-    });
-
-    // 3. FUNGSI TOMBOL
     function startMonitoring() {
-        const intervalVal = document.getElementById("intervalInput").value || 2; 
-        db.ref("pengaturan/running").set(true);
-        db.ref("pengaturan/interval").set(parseInt(intervalVal));
+        const intervalSec = document.getElementById("intervalInput").value * 1000;
+        isMonitoring = true;
+        if (updateInterval) clearInterval(updateInterval);
+        updateInterval = setInterval(fetchData, intervalSec);
+        document.getElementById("startBtn").disabled = true;
+        document.getElementById("stopBtn").disabled = false;
     }
 
     function stopMonitoring() {
-        db.ref("pengaturan/running").set(false);
+        isMonitoring = false;
+        clearInterval(updateInterval);
+        document.getElementById("startBtn").disabled = false;
+        document.getElementById("stopBtn").disabled = true;
     }
 
-    // Reset input saat halaman dibuka
-    window.onload = function() {
-        document.getElementById("intervalInput").value = ""; 
-    };
+    startMonitoring();
 </script>
+</body>
+</html>
