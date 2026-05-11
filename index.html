@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PENETAS TELUR | IoT Monitoring</title>
+    <title>PENETAS TELUR | Smart Monitoring</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -14,7 +14,6 @@
         .glass-card { background: rgba(25, 28, 41, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; }
         .btn-gradient { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); transition: 0.3s; }
         .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
-        #digital-clock { font-family: 'Courier New', Courier, monospace; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -40,45 +39,35 @@
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        <div class="lg:col-span-2 glass-card p-6 flex flex-col justify-center">
+        <div class="lg:col-span-2 glass-card p-6">
             <h3 class="font-bold mb-4 flex items-center gap-2 text-yellow-500"><i class="fas fa-sliders-h"></i> CONTROL PANEL</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-4">
-                    <p class="text-gray-400 text-sm">Set Polling Interval</p>
+                <div class="space-y-4 border-r border-white/5 pr-4">
+                    <p class="text-gray-400 text-sm italic underline">Monitoring Settings:</p>
                     <input id="intervalInput" type="number" placeholder="Detik (Contoh: 5)" class="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-yellow-500">
                     <div class="grid grid-cols-2 gap-3">
                         <button id="startBtn" onclick="startMonitoring()" class="btn-gradient p-3 rounded-lg font-bold">START</button>
                         <button id="stopBtn" onclick="stopMonitoring()" class="bg-red-600 hover:bg-red-700 p-3 rounded-lg font-bold transition">STOP</button>
                     </div>
                 </div>
-                <div class="bg-slate-800/50 rounded-xl p-4 flex flex-col justify-center items-center">
-                    <p class="text-gray-400 text-xs mb-2">System Status</p>
-                    <div id="conn-stat-circle" class="relative w-20 h-20 rounded-full border-4 border-yellow-500/20 flex items-center justify-center mb-2">
-                        <p id="conn-stat" class="text-yellow-400 font-bold text-[10px] text-center">STANDBY</p>
+                <div class="space-y-3">
+                    <p class="text-gray-400 text-sm italic underline">Manual Fan Override:</p>
+                    <div class="grid grid-cols-1 gap-2">
+                        <button onclick="setFan(1)" class="bg-blue-600 hover:bg-blue-700 p-2 rounded text-xs font-bold transition">FORCE ON</button>
+                        <button onclick="setFan(0)" class="bg-gray-600 hover:bg-gray-700 p-2 rounded text-xs font-bold transition">FORCE OFF</button>
+                        <button onclick="setFan(2)" class="bg-purple-600 hover:bg-purple-700 p-2 rounded text-xs font-bold transition">AUTO MODE</button>
                     </div>
+                    <p id="fan-mode-status" class="text-[10px] text-center text-purple-400 font-mono">Mode: AUTO</p>
                 </div>
             </div>
         </div>
 
         <div class="glass-card p-6 flex flex-col justify-center">
             <h3 class="font-bold mb-4 text-sm text-blue-400"><i class="fas fa-network-wired mr-2"></i>DEVICE INFO</h3>
-            <div class="space-y-4">
-                <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span class="text-gray-400 text-xs">Hardware</span>
-                    <span class="text-sm font-semibold">ESP32 DevKit V1</span>
-                </div>
-                <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span class="text-gray-400 text-xs">Database</span>
-                    <span class="text-sm font-semibold text-orange-400">Firebase RTDB</span>
-                </div>
-                <div class="flex justify-between items-center border-b border-white/5 pb-2">
-                    <span class="text-gray-400 text-xs">Sensor</span>
-                    <span class="text-sm font-semibold">SHT31 / DHT</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-400 text-xs">Location</span>
-                    <span class="text-sm font-semibold">Incubator Unit A</span>
-                </div>
+            <div class="space-y-3 text-sm">
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Hardware</span><span>ESP32 V1</span></div>
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Status</span><span id="conn-stat" class="text-yellow-400 font-bold">STANDBY</span></div>
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Sensor</span><span>DHT22</span></div>
             </div>
         </div>
     </div>
@@ -86,34 +75,29 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="glass-card p-6 flex items-center gap-4 border-l-4 border-orange-500">
             <div class="p-4 bg-orange-500/20 rounded-xl"><i class="fas fa-thermometer-three-quarters text-orange-500 text-2xl"></i></div>
-            <div><p class="text-gray-400 text-sm">Air Temperature</p><h2 id="txt-suhu" class="text-3xl font-bold">0.0</h2><p class="text-xs text-orange-400">°Celsius</p></div>
+            <div><p class="text-gray-400 text-sm">Temperature</p><h2 id="txt-suhu" class="text-3xl font-bold">0.0</h2><p class="text-xs text-orange-400">°Celsius</p></div>
         </div>
         <div class="glass-card p-6 flex items-center gap-4 border-l-4 border-blue-500">
             <div class="p-4 bg-blue-500/20 rounded-xl"><i class="fas fa-cloud-showers-heavy text-blue-500 text-2xl"></i></div>
-            <div><p class="text-gray-400 text-sm">Air Humidity</p><h2 id="txt-kelembapan" class="text-3xl font-bold">0</h2><p class="text-xs text-blue-400">% RH</p></div>
+            <div><p class="text-gray-400 text-sm">Humidity</p><h2 id="txt-kelembapan" class="text-3xl font-bold">0</h2><p class="text-xs text-blue-400">% RH</p></div>
         </div>
         <div class="glass-card p-6 flex items-center gap-4 border-l-4 border-green-500">
             <div class="p-4 bg-green-500/20 rounded-xl"><i class="fas fa-check-circle text-green-500 text-2xl"></i></div>
-            <div><p class="text-gray-400 text-sm">Hatching Status</p><h2 id="txt-status" class="text-xl font-bold text-green-400">NORMAL</h2></div>
+            <div><p class="text-gray-400 text-sm">Fan Status</p><h2 id="txt-status" class="text-xl font-bold text-green-400">NORMAL</h2></div>
         </div>
     </div>
 
     <div class="glass-card p-6 mb-8">
-        <h3 class="font-bold mb-4 flex justify-between">Incubation Summary <span class="text-xs text-gray-400">Live Trend Chart</span></h3>
+        <h3 class="font-bold mb-4 flex justify-between">Incubation Trend <span class="text-xs text-gray-400">Live Data</span></h3>
         <canvas id="iotChart" height="80"></canvas>
     </div>
 
     <div class="glass-card p-6 overflow-hidden">
-        <h3 class="font-bold mb-4 italic text-yellow-500">Hatching Logs (Real-time)</h3>
-        <div class="overflow-x-auto">
-            <table id="logTable" class="w-full text-left">
-                <thead class="text-gray-400 text-xs uppercase">
-                    <tr>
-                        <th class="p-4">Timestamp</th>
-                        <th class="p-4">Temp</th>
-                        <th class="p-4">Humidity</th>
-                        <th class="p-4">Action</th>
-                    </tr>
+        <h3 class="font-bold mb-4 italic text-yellow-500">Hatching Logs</h3>
+        <div class="max-h-60 overflow-y-auto">
+            <table class="w-full text-left">
+                <thead class="text-gray-400 text-xs uppercase sticky top-0 bg-[#0f111a]">
+                    <tr><th class="p-4">Timestamp</th><th class="p-4">Temp</th><th class="p-4">Humidity</th><th class="p-4">Fan</th></tr>
                 </thead>
                 <tbody id="log-table-body" class="text-sm"></tbody>
             </table>
@@ -121,16 +105,12 @@
     </div>
 
     <script>
-        // --- JAM DIGITAL ---
         function updateClock() {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
-            document.getElementById('digital-clock').innerText = timeStr;
+            document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID', { hour12: false });
         }
         setInterval(updateClock, 1000);
-        updateClock();
 
-        // --- KONFIGURASI FIREBASE ---
+        // CONFIG FIREBASE
         const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -142,15 +122,17 @@
         const ctx = document.getElementById('iotChart').getContext('2d');
         const myChart = new Chart(ctx, {
             type: 'line',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'Suhu (°C)', data: [], borderColor: '#f97316', tension: 0.4, fill: false },
-                    { label: 'Kelembapan (%)', data: [], borderColor: '#3b82f6', tension: 0.4, fill: false }
-                ]
-            },
+            data: { labels: [], datasets: [
+                { label: 'Temp (°C)', data: [], borderColor: '#f97316', tension: 0.4 },
+                { label: 'Humid (%)', data: [], borderColor: '#3b82f6', tension: 0.4 }
+            ]},
             options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
         });
+
+        // FUNGSI CONTROL KIPAS
+        function setFan(val) {
+            db.ref("pengaturan").update({ kipasManual: val });
+        }
 
         function fetchData() {
             if (!isRunning) return;
@@ -159,32 +141,29 @@
                 if (data) {
                     const s = parseFloat(data.suhu || 0).toFixed(1);
                     const k = parseFloat(data.kelembapan || 0).toFixed(1);
-                    const st = data.status || "NORMAL";
-                    const waktuJam = new Date().toLocaleTimeString('id-ID');
-                    const waktuLengkap = new Date().toLocaleString('id-ID');
+                    const st = data.status || "OFF";
+                    const wktJam = new Date().toLocaleTimeString('id-ID');
 
                     document.getElementById("txt-suhu").innerText = s;
                     document.getElementById("txt-kelembapan").innerText = k;
                     document.getElementById("txt-status").innerText = st;
-                    document.getElementById("txt-status").className = st === "NORMAL" ? "text-xl font-bold text-green-400" : "text-xl font-bold text-orange-500 animate-pulse";
 
-                    logData.push({ waktu: waktuLengkap, s, k, st });
-
+                    logData.push({ waktu: new Date().toLocaleString(), s, k, st });
                     if (myChart.data.labels.length > 15) {
                         myChart.data.labels.shift();
                         myChart.data.datasets[0].data.shift();
                         myChart.data.datasets[1].data.shift();
                     }
-                    myChart.data.labels.push(waktuJam);
+                    myChart.data.labels.push(wktJam);
                     myChart.data.datasets[0].data.push(s);
                     myChart.data.datasets[1].data.push(k);
                     myChart.update('none');
 
                     const newRow = `<tr>
-                        <td class="p-4 text-gray-400">${waktuLengkap}</td>
-                        <td class="p-4 font-bold text-orange-400">${s}°C</td>
-                        <td class="p-4 font-bold text-blue-400">${k}%</td>
-                        <td class="p-4"><span class="status-badge ${st==='NORMAL'?'bg-green-500/20 text-green-400':'bg-orange-500/20 text-orange-400'}">${st}</span></td>
+                        <td class="p-4 text-gray-400">${new Date().toLocaleString()}</td>
+                        <td class="p-4 text-orange-400">${s}°C</td>
+                        <td class="p-4 text-blue-400">${k}%</td>
+                        <td class="p-4"><span class="status-badge bg-white/5">${st}</span></td>
                     </tr>`;
                     document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
@@ -195,18 +174,19 @@
             const settings = snap.val();
             if(!settings) return;
             isRunning = settings.running;
-            const intervalMs = (settings.interval || 5) * 1000;
-            document.getElementById("startBtn").disabled = isRunning;
-            document.getElementById("stopBtn").disabled = !isRunning;
-            document.getElementById("conn-stat").innerText = isRunning ? "MONITORING" : "STANDBY";
-            document.getElementById("conn-stat-circle").className = isRunning ? "relative w-20 h-20 rounded-full border-4 border-green-500/50 flex items-center justify-center mb-2" : "relative w-20 h-20 rounded-full border-4 border-yellow-500/20 flex items-center justify-center mb-2";
-            document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold text-[10px]" : "text-yellow-400 font-bold text-[10px]";
             
+            // Update UI Status Monitoring
+            document.getElementById("conn-stat").innerText = isRunning ? "MONITORING" : "STANDBY";
+            document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
+            
+            // Update UI Mode Kipas
+            const modeText = document.getElementById("fan-mode-status");
+            if(settings.kipasManual === 1) modeText.innerText = "Mode: FORCE ON";
+            else if(settings.kipasManual === 0) modeText.innerText = "Mode: FORCE OFF";
+            else modeText.innerText = "Mode: AUTO (38°C)";
+
             if (pollingTimer) clearInterval(pollingTimer);
-            if (isRunning) {
-                fetchData();
-                pollingTimer = setInterval(fetchData, intervalMs);
-            }
+            if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
         });
 
         function startMonitoring() {
@@ -215,16 +195,12 @@
         }
         function stopMonitoring() { db.ref("pengaturan/running").set(false); }
         function downloadCSV() {
-            if (logData.length === 0) return;
-            let csvContent = "data:text/csv;charset=utf-8,Timestamp,Temp,Humidity,Status\n";
-            logData.forEach(row => { csvContent += `${row.waktu},${row.s},${row.k},${row.st}\n`; });
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "PenetasTelur_DataLog.csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            let csv = "Timestamp,Temp,Humidity,Fan\n";
+            logData.forEach(r => { csv += `${r.waktu},${r.s},${r.k},${r.st}\n` });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = 'Data_Penetas.csv'; a.click();
         }
     </script>
 </body>
