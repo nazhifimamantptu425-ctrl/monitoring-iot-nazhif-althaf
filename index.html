@@ -13,17 +13,19 @@
         body { background-color: #0f111a; color: #ffffff; font-family: 'Inter', sans-serif; }
         .glass-card { background: rgba(25, 28, 41, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; }
         .btn-gradient { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); transition: 0.3s; }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
-            <h1 class="text-3xl font-bold italic text-yellow-500"><i class="fas fa-egg mr-2"></i>PENETAS TELUR <span class="text-white font-light text-sm ml-2">Smart Incubator</span></h1>
+            <h1 class="text-3xl font-bold italic text-yellow-500"><i class="fas fa-egg mr-2"></i>PENETAS TELUR <span class="text-white font-light text-sm ml-2 italic">Smart Incubator</span></h1>
             <div id="digital-clock" class="text-xl font-bold text-blue-400 mt-1">00:00:00</div>
         </div>
         <div class="flex items-center gap-4">
-            <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition">
+            <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition shadow-lg">
                 <i class="fas fa-file-download"></i> DOWNLOAD DATA
             </button>
             <div class="flex items-center gap-4 glass-card p-3">
@@ -31,7 +33,7 @@
                     <p class="text-xs text-gray-400">Welcome,</p>
                     <p class="font-bold text-sm">Nazhif, Althaf & Indria</p>
                 </div>
-                <div class="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center">
+                <div class="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center shadow-inner">
                     <i class="fas fa-users text-white"></i>
                 </div>
             </div>
@@ -43,36 +45,32 @@
             <h3 class="font-bold mb-4 flex items-center gap-2 text-yellow-500"><i class="fas fa-sliders-h"></i> CONTROL PANEL</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="space-y-4 border-r border-white/5 pr-4">
-                    <p class="text-gray-400 text-sm italic underline">Monitoring Settings:</p>
-                    <input id="intervalInput" type="number" placeholder="Detik (Contoh: 5)" class="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-yellow-500">
+                    <input id="intervalInput" type="number" placeholder="Interval (Detik)" class="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-yellow-500 text-sm">
                     <div class="grid grid-cols-2 gap-3">
-                        <button onclick="startMonitoring()" class="btn-gradient p-3 rounded-lg font-bold">START</button>
-                        <button onclick="stopMonitoring()" class="bg-red-600 hover:bg-red-700 p-3 rounded-lg font-bold transition">STOP</button>
+                        <button onclick="startMonitoring()" class="btn-gradient p-3 rounded-lg font-bold text-sm shadow-lg hover:scale-105 transition">START</button>
+                        <button onclick="stopMonitoring()" class="bg-red-600 hover:bg-red-700 p-3 rounded-lg font-bold text-sm transition shadow-lg">STOP</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 gap-4">
-                    <div class="space-y-2">
-                        <p class="text-gray-400 text-[11px] italic underline">Manual Overrides:</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="setLamp(2)" class="bg-yellow-600 p-2 rounded text-[10px] font-bold">LAMP AUTO</button>
-                            <button onclick="setFan(2)" class="bg-purple-600 p-2 rounded text-[10px] font-bold">FAN AUTO</button>
-                        </div>
+                <div class="flex flex-col justify-center space-y-3">
+                    <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                        <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Mekanisme Rak Telur:</p>
+                        <p id="txt-status-servo-main" class="text-purple-400 font-bold text-lg">DIAM (0°)</p>
+                        <p id="txt-servo-timer" class="text-[10px] text-gray-500 italic">Durasi: 0 menit</p>
                     </div>
-                    <div class="bg-white/5 p-3 rounded-lg text-center">
-                        <p class="text-gray-400 text-[10px] mb-1 italic">Servo Status:</p>
-                        <p id="txt-status-servo-main" class="text-purple-400 font-bold text-sm">DIAM (0°)</p>
-                        <p id="txt-servo-timer" class="text-[9px] text-gray-500 italic mt-1">Durasi: 0 menit</p>
+                    <div class="flex gap-2">
+                        <button onclick="setLamp(2)" class="flex-1 bg-yellow-600/20 text-yellow-500 border border-yellow-500/30 p-2 rounded text-[10px] font-bold">LAMP AUTO</button>
+                        <button onclick="setFan(2)" class="flex-1 bg-purple-600/20 text-purple-500 border border-purple-500/30 p-2 rounded text-[10px] font-bold">FAN AUTO</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="glass-card p-6 flex flex-col justify-center">
-            <h3 class="font-bold mb-4 text-sm text-blue-400"><i class="fas fa-network-wired mr-2"></i>DEVICE INFO</h3>
-            <div class="space-y-3 text-sm">
-                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Status</span><span id="conn-stat" class="text-yellow-400 font-bold italic text-xs">STANDBY</span></div>
-                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Rak Telur</span><span id="txt-sudut-raw" class="font-bold">0°</span></div>
-                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">ESP32</span><span class="text-green-500">ONLINE</span></div>
+        <div class="glass-card p-6 flex flex-col justify-center text-sm">
+            <h3 class="font-bold mb-4 text-blue-400"><i class="fas fa-network-wired mr-2"></i>DEVICE INFO</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">System</span><span id="conn-stat" class="text-yellow-400 font-bold italic text-xs">STANDBY</span></div>
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Angle Raw</span><span id="txt-sudut-raw" class="font-bold">0°</span></div>
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Heartbeat</span><span class="text-green-500 animate-pulse">● ONLINE</span></div>
             </div>
         </div>
     </div>
@@ -87,8 +85,8 @@
             <div><p class="text-gray-400 text-sm">Humidity</p><h2 id="txt-kelembapan" class="text-3xl font-bold">0</h2><p class="text-xs text-blue-400">% RH</p></div>
         </div>
         <div class="glass-card p-6 flex items-center gap-4 border-l-4 border-green-500">
-            <div class="p-4 bg-green-500/20 rounded-xl"><i class="fas fa-toggle-on text-green-500 text-2xl"></i></div>
-            <div><p class="text-gray-400 text-sm">Relay Stats</p><h2 id="txt-status-act" class="text-sm font-bold text-green-400 italic">L:OFF | K:OFF</h2></div>
+            <div class="p-4 bg-green-500/20 rounded-xl"><i class="fas fa-microchip text-green-500 text-2xl"></i></div>
+            <div><p class="text-gray-400 text-sm">Relay Stats</p><h2 id="txt-status-act" class="text-xs font-bold text-green-400 italic">L:OFF | K:OFF</h2></div>
         </div>
     </div>
 
@@ -96,11 +94,11 @@
         <canvas id="iotChart" height="80"></canvas>
     </div>
 
-    <div class="glass-card p-6 overflow-hidden">
-        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm">HATCHING LOGS & MOVEMENT</h3>
-        <div class="max-h-60 overflow-y-auto">
+    <div class="glass-card p-6">
+        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm flex items-center gap-2"><i class="fas fa-history"></i> HATCHING LOGS & MOVEMENT</h3>
+        <div class="max-h-72 overflow-y-auto pr-2">
             <table class="w-full text-left text-[11px]">
-                <thead class="text-gray-400 uppercase sticky top-0 bg-[#0f111a]">
+                <thead class="text-gray-400 uppercase sticky top-0 bg-[#1a1d2b] shadow-sm">
                     <tr>
                         <th class="p-4">Timestamp</th>
                         <th class="p-4">Suhu/Humid</th>
@@ -118,20 +116,17 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        let isRunning = false;
-        let logData = [];
-        let pollingTimer = null;
-        let lastServoPos = -1;
-        let posStartTime = Date.now();
+        let isRunning = false; let logData = []; let pollingTimer = null;
+        let lastServoPos = -1; let posStartTime = Date.now();
 
         const ctx = document.getElementById('iotChart').getContext('2d');
         const myChart = new Chart(ctx, {
             type: 'line',
             data: { labels: [], datasets: [
-                { label: 'Temp (°C)', data: [], borderColor: '#f97316', tension: 0.4 },
-                { label: 'Humid (%)', data: [], borderColor: '#3b82f6', tension: 0.4 }
+                { label: 'Temp', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
+                { label: 'Humid', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }
             ]},
-            options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+            options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
         });
 
         function setFan(val) { db.ref("pengaturan").update({ kipasManual: val }); }
@@ -147,58 +142,37 @@
                     const sk = data.statusKipas || "OFF";
                     const sl = data.statusLampu || "OFF";
                     const sv = data.sudutServo || 0;
-                    const wktJam = new Date().toLocaleTimeString('id-ID');
+                    const wkt = new Date().toLocaleTimeString('id-ID');
 
-                    // Logika Timer Servo
-                    if (sv !== lastServoPos) {
-                        lastServoPos = sv;
-                        posStartTime = Date.now();
-                    }
+                    // Timer Logic
+                    if (sv !== lastServoPos) { lastServoPos = sv; posStartTime = Date.now(); }
                     let durationMin = Math.floor((Date.now() - posStartTime) / 60000);
-                    const servoStatusTeks = (sv == 90) ? "BERGERAK" : "DIAM";
-                    const servoColor = (sv == 90) ? "text-yellow-400" : "text-purple-400";
+                    const statusTeks = (sv == 90) ? "BERGERAK" : "DIAM";
+                    const colorClass = (sv == 90) ? "text-yellow-400" : "text-purple-400";
 
-                    // Update UI Cards
+                    // Update UI
                     document.getElementById("txt-suhu").innerText = s + "°C";
                     document.getElementById("txt-kelembapan").innerText = k + "%";
                     document.getElementById("txt-status-act").innerText = `L: ${sl} | K: ${sk}`;
-                    
-                    // Update Servo Info
-                    document.getElementById("txt-status-servo-main").innerText = `${servoStatusTeks} (${sv}°)`;
-                    document.getElementById("txt-status-servo-main").className = `${servoColor} font-bold text-sm`;
+                    document.getElementById("txt-status-servo-main").innerText = `${statusTeks} (${sv}°)`;
+                    document.getElementById("txt-status-servo-main").className = `${colorClass} font-bold text-lg`;
                     document.getElementById("txt-servo-timer").innerText = `Durasi posisi ini: ${durationMin} menit`;
                     document.getElementById("txt-sudut-raw").innerText = sv + "°";
 
-                    // Update Chart
-                    if (myChart.data.labels.length > 15) {
-                        myChart.data.labels.shift();
-                        myChart.data.datasets[0].data.shift();
-                        myChart.data.datasets[1].data.shift();
-                    }
-                    myChart.data.labels.push(wktJam);
-                    myChart.data.datasets[0].data.push(s);
-                    myChart.data.datasets[1].data.push(k);
-                    myChart.update('none');
+                    // Chart & Logs
+                    if (myChart.data.labels.length > 15) { myChart.data.labels.shift(); myChart.data.datasets[0].data.shift(); myChart.data.datasets[1].data.shift(); }
+                    myChart.data.labels.push(wkt); myChart.data.datasets[0].data.push(s); myChart.data.datasets[1].data.push(k); myChart.update('none');
 
-                    // Update Table Log
-                    const logEntry = { waktu: new Date().toLocaleString(), s, k, sv, st: servoStatusTeks, dur: durationMin, act: `L:${sl}|K:${sk}` };
+                    const logEntry = { t: new Date().toLocaleString(), s, k, sv, st: statusTeks, d: durationMin };
                     logData.push(logEntry);
-                    
-                    const newRow = `
-                        <tr class="border-b border-white/5">
-                            <td class="p-4 text-gray-400">${wktJam}</td>
-                            <td class="p-4">${s}°C / ${k}%</td>
-                            <td class="p-4 font-bold ${servoColor}">${servoStatusTeks}</td>
-                            <td class="p-4 italic text-gray-500">Servo ${servoStatusTeks.toLowerCase()} di menit ke-${durationMin}</td>
-                        </tr>`;
+                    const newRow = `<tr class="border-b border-white/5 hover:bg-white/5 transition"><td class="p-4 text-gray-400">${wkt}</td><td class="p-4 font-mono">${s}°C / ${k}%</td><td class="p-4 font-bold ${colorClass}">${statusTeks}</td><td class="p-4 italic text-gray-500">Servo ${statusTeks.toLowerCase()} menit ke-${durationMin}</td></tr>`;
                     document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
             });
         }
 
         db.ref("pengaturan").on("value", (snap) => {
-            const settings = snap.val();
-            if(!settings) return;
+            const settings = snap.val(); if(!settings) return;
             isRunning = settings.running;
             document.getElementById("conn-stat").innerText = isRunning ? "MONITORING" : "STANDBY";
             document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold italic text-xs" : "text-yellow-400 font-bold italic text-xs";
@@ -207,17 +181,18 @@
         });
 
         function startMonitoring() { 
+            isRunning = true;
             const val = document.getElementById("intervalInput").value || 5;
-            db.ref("pengaturan").update({ running: true, interval: parseInt(val) }); 
+            db.ref("pengaturan").update({ running: true, interval: parseInt(val) }).then(() => { fetchData(); });
         }
-        function stopMonitoring() { db.ref("pengaturan/running").set(false); }
+        function stopMonitoring() { isRunning = false; db.ref("pengaturan/running").set(false); }
         
         function downloadCSV() {
-            let csv = "Timestamp,Temp,Humid,ServoStatus,MinuteElapsed,Actuators\n";
-            logData.forEach(r => { csv += `${r.waktu},${r.s},${r.k},${r.st},${r.dur},${r.act}\n` });
+            let csv = "Timestamp,Temp,Humid,Servo,Duration(Min)\n";
+            logData.forEach(r => { csv += `${r.t},${r.s},${r.k},${r.st},${r.d}\n` });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'Log_Inkubator_Bebek.csv'; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = 'Log_Inkubator.csv'; a.click();
         }
         setInterval(() => { document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); }, 1000);
     </script>
