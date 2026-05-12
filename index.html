@@ -50,14 +50,25 @@
                         <button id="stopBtn" onclick="stopMonitoring()" class="bg-red-600 hover:bg-red-700 p-3 rounded-lg font-bold transition">STOP</button>
                     </div>
                 </div>
-                <div class="space-y-3">
-                    <p class="text-gray-400 text-sm italic underline">Manual Fan Override:</p>
-                    <div class="grid grid-cols-1 gap-2">
-                        <button onclick="setFan(1)" class="bg-blue-600 hover:bg-blue-700 p-2 rounded text-xs font-bold transition">FORCE ON</button>
-                        <button onclick="setFan(0)" class="bg-gray-600 hover:bg-gray-700 p-2 rounded text-xs font-bold transition">FORCE OFF</button>
-                        <button onclick="setFan(2)" class="bg-purple-600 hover:bg-purple-700 p-2 rounded text-xs font-bold transition">AUTO MODE</button>
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-2">
+                        <p class="text-gray-400 text-[11px] italic underline">Manual Fan Override:</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setFan(1)" class="bg-blue-600 hover:bg-blue-700 p-2 rounded text-[10px] font-bold transition">ON</button>
+                            <button onclick="setFan(0)" class="bg-gray-600 hover:bg-gray-700 p-2 rounded text-[10px] font-bold transition">OFF</button>
+                            <button onclick="setFan(2)" class="bg-purple-600 hover:bg-purple-700 p-2 rounded text-[10px] font-bold transition">AUTO</button>
+                        </div>
+                        <p id="fan-mode-status" class="text-[9px] text-center text-purple-400 font-mono">Mode: AUTO</p>
                     </div>
-                    <p id="fan-mode-status" class="text-[10px] text-center text-purple-400 font-mono">Mode: AUTO</p>
+                    <div class="space-y-2">
+                        <p class="text-gray-400 text-[11px] italic underline">Manual Lamp Override:</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setLamp(1)" class="bg-orange-600 hover:bg-orange-700 p-2 rounded text-[10px] font-bold transition">ON</button>
+                            <button onclick="setLamp(0)" class="bg-gray-600 hover:bg-gray-700 p-2 rounded text-[10px] font-bold transition">OFF</button>
+                            <button onclick="setLamp(2)" class="bg-yellow-600 hover:bg-yellow-700 p-2 rounded text-[10px] font-bold transition">AUTO</button>
+                        </div>
+                        <p id="lamp-mode-status" class="text-[9px] text-center text-yellow-400 font-mono">Mode: AUTO</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -83,7 +94,7 @@
         </div>
         <div class="glass-card p-6 flex items-center gap-4 border-l-4 border-green-500">
             <div class="p-4 bg-green-500/20 rounded-xl"><i class="fas fa-check-circle text-green-500 text-2xl"></i></div>
-            <div><p class="text-gray-400 text-sm">Fan Status</p><h2 id="txt-status" class="text-xl font-bold text-green-400">NORMAL</h2></div>
+            <div><p class="text-gray-400 text-sm">Device Status</p><h2 id="txt-status" class="text-sm font-bold text-green-400 italic">SYSTEM READY</h2></div>
         </div>
     </div>
 
@@ -92,25 +103,12 @@
         <canvas id="iotChart" height="80"></canvas>
     </div>
 
-    <div class="glass-card p-6 overflow-hidden">
-        <h3 class="font-bold mb-4 italic text-yellow-500">Hatching Logs</h3>
-        <div class="max-h-60 overflow-y-auto">
-            <table class="w-full text-left">
-                <thead class="text-gray-400 text-xs uppercase sticky top-0 bg-[#0f111a]">
-                    <tr><th class="p-4">Timestamp</th><th class="p-4">Temp</th><th class="p-4">Humidity</th><th class="p-4">Fan</th></tr>
-                </thead>
-                <tbody id="log-table-body" class="text-sm"></tbody>
-            </table>
-        </div>
-    </div>
-
     <script>
         function updateClock() {
             document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID', { hour12: false });
         }
         setInterval(updateClock, 1000);
 
-        // CONFIG FIREBASE
         const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -129,10 +127,8 @@
             options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
         });
 
-        // FUNGSI CONTROL KIPAS
-        function setFan(val) {
-            db.ref("pengaturan").update({ kipasManual: val });
-        }
+        function setFan(val) { db.ref("pengaturan").update({ kipasManual: val }); }
+        function setLamp(val) { db.ref("pengaturan").update({ lampuManual: val }); }
 
         function fetchData() {
             if (!isRunning) return;
@@ -141,14 +137,15 @@
                 if (data) {
                     const s = parseFloat(data.suhu || 0).toFixed(1);
                     const k = parseFloat(data.kelembapan || 0).toFixed(1);
-                    const st = data.status || "OFF";
+                    const sk = data.statusKipas || "OFF";
+                    const sl = data.statusLampu || "OFF";
                     const wktJam = new Date().toLocaleTimeString('id-ID');
 
                     document.getElementById("txt-suhu").innerText = s;
                     document.getElementById("txt-kelembapan").innerText = k;
-                    document.getElementById("txt-status").innerText = st;
+                    document.getElementById("txt-status").innerText = `FAN: ${sk} | LAMP: ${sl}`;
 
-                    logData.push({ waktu: new Date().toLocaleString(), s, k, st });
+                    logData.push({ waktu: new Date().toLocaleString(), s, k, sk, sl });
                     if (myChart.data.labels.length > 15) {
                         myChart.data.labels.shift();
                         myChart.data.datasets[0].data.shift();
@@ -158,14 +155,6 @@
                     myChart.data.datasets[0].data.push(s);
                     myChart.data.datasets[1].data.push(k);
                     myChart.update('none');
-
-                    const newRow = `<tr>
-                        <td class="p-4 text-gray-400">${new Date().toLocaleString()}</td>
-                        <td class="p-4 text-orange-400">${s}°C</td>
-                        <td class="p-4 text-blue-400">${k}%</td>
-                        <td class="p-4"><span class="status-badge bg-white/5">${st}</span></td>
-                    </tr>`;
-                    document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
             });
         }
@@ -174,16 +163,18 @@
             const settings = snap.val();
             if(!settings) return;
             isRunning = settings.running;
-            
-            // Update UI Status Monitoring
             document.getElementById("conn-stat").innerText = isRunning ? "MONITORING" : "STANDBY";
             document.getElementById("conn-stat").className = isRunning ? "text-green-400 font-bold" : "text-yellow-400 font-bold";
             
-            // Update UI Mode Kipas
-            const modeText = document.getElementById("fan-mode-status");
-            if(settings.kipasManual === 1) modeText.innerText = "Mode: FORCE ON";
-            else if(settings.kipasManual === 0) modeText.innerText = "Mode: FORCE OFF";
-            else modeText.innerText = "Mode: AUTO (38°C)";
+            const fanModeText = document.getElementById("fan-mode-status");
+            if(settings.kipasManual === 1) fanModeText.innerText = "Mode: FORCE ON";
+            else if(settings.kipasManual === 0) fanModeText.innerText = "Mode: FORCE OFF";
+            else fanModeText.innerText = "Mode: AUTO (39°C)";
+
+            const lampModeText = document.getElementById("lamp-mode-status");
+            if(settings.lampuManual === 1) lampModeText.innerText = "Mode: FORCE ON";
+            else if(settings.lampuManual === 0) lampModeText.innerText = "Mode: FORCE OFF";
+            else lampModeText.innerText = "Mode: AUTO (37.5°C)";
 
             if (pollingTimer) clearInterval(pollingTimer);
             if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
@@ -195,12 +186,12 @@
         }
         function stopMonitoring() { db.ref("pengaturan/running").set(false); }
         function downloadCSV() {
-            let csv = "Timestamp,Temp,Humidity,Fan\n";
-            logData.forEach(r => { csv += `${r.waktu},${r.s},${r.k},${r.st}\n` });
+            let csv = "Timestamp,Temp,Humidity,FanStatus,LampStatus\n";
+            logData.forEach(r => { csv += `${r.waktu},${r.s},${r.k},${r.sk},${r.sl}\n` });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url; a.download = 'Data_Penetas.csv'; a.click();
+            a.href = url; a.download = 'Data_Penetas_Full.csv'; a.click();
         }
     </script>
 </body>
