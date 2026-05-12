@@ -13,75 +13,171 @@
         body { background-color: #0f111a; color: #ffffff; font-family: 'Inter', sans-serif; }
         .glass-card { background: rgba(25, 28, 41, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 16px; }
         .btn-gradient { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); transition: 0.3s; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; }
     </style>
 </head>
 <body class="p-4 md:p-8">
     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
-            <h1 class="text-3xl font-bold italic text-yellow-500"><i class="fas fa-egg mr-2"></i>PENETAS TELUR</h1>
+            <h1 class="text-3xl font-bold italic text-yellow-500"><i class="fas fa-egg mr-2"></i>PENETAS TELUR <span class="text-white font-light text-sm ml-2">Smart Incubator</span></h1>
             <div id="digital-clock" class="text-xl font-bold text-blue-400 mt-1">00:00:00</div>
         </div>
-        <div class="glass-card p-3 flex items-center gap-4">
-            <div class="text-right"><p class="text-xs text-gray-400">Team:</p><p class="font-bold text-sm">Nazhif & Althaf</p></div>
-            <div class="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center"><i class="fas fa-users text-white"></i></div>
+        <div class="flex items-center gap-4">
+            <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition">
+                <i class="fas fa-file-download"></i> DOWNLOAD DATA
+            </button>
+            <div class="flex items-center gap-4 glass-card p-3">
+                <div class="text-right">
+                    <p class="text-xs text-gray-400">Welcome,</p>
+                    <p class="font-bold text-sm">Nazhif, Althaf & Indria</p>
+                </div>
+                <div class="w-10 h-10 bg-yellow-600 rounded-full flex items-center justify-center">
+                    <i class="fas fa-users text-white"></i>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div class="lg:col-span-2 glass-card p-6">
+            <h3 class="font-bold mb-4 flex items-center gap-2 text-yellow-500"><i class="fas fa-sliders-h"></i> CONTROL PANEL</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="space-y-4 border-r border-white/5 pr-4">
+                    <p class="text-gray-400 text-sm italic underline">Monitoring Settings:</p>
+                    <input id="intervalInput" type="number" placeholder="Detik (Contoh: 5)" class="w-full bg-slate-800 border border-white/10 rounded-lg p-3 text-white outline-none focus:border-yellow-500">
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="startMonitoring()" class="btn-gradient p-3 rounded-lg font-bold">START</button>
+                        <button onclick="stopMonitoring()" class="bg-red-600 hover:bg-red-700 p-3 rounded-lg font-bold transition">STOP</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-2">
+                        <p class="text-gray-400 text-[11px] italic underline">Manual Fan Override:</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setFan(1)" class="bg-blue-600 p-2 rounded text-[10px] font-bold">ON</button>
+                            <button onclick="setFan(0)" class="bg-gray-600 p-2 rounded text-[10px] font-bold">OFF</button>
+                            <button onclick="setFan(2)" class="bg-purple-600 p-2 rounded text-[10px] font-bold">AUTO</button>
+                        </div>
+                        <p id="fan-mode-status" class="text-[9px] text-center text-purple-400 font-mono">Mode: AUTO</p>
+                    </div>
+                    <div class="space-y-2">
+                        <p class="text-gray-400 text-[11px] italic underline">Manual Lamp Override:</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="setLamp(1)" class="bg-orange-600 p-2 rounded text-[10px] font-bold">ON</button>
+                            <button onclick="setLamp(0)" class="bg-gray-600 p-2 rounded text-[10px] font-bold">OFF</button>
+                            <button onclick="setLamp(2)" class="bg-yellow-600 p-2 rounded text-[10px] font-bold">AUTO</button>
+                        </div>
+                        <p id="lamp-mode-status" class="text-[9px] text-center text-yellow-400 font-mono">Mode: AUTO</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="glass-card p-6 flex flex-col justify-center text-sm">
+            <h3 class="font-bold mb-4 text-blue-400"><i class="fas fa-network-wired mr-2"></i>DEVICE INFO</h3>
+            <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Status</span><span id="conn-stat" class="text-yellow-400 font-bold italic">STANDBY</span></div>
+            <div class="flex justify-between border-b border-white/5 pb-1 mt-2"><span class="text-gray-400">Servo Angle</span><span id="txt-status-servo" class="text-purple-400 font-bold">0° <i id="icon-servo" class="fas fa-sync-alt ml-1"></i></span></div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
         <div class="glass-card p-6 border-l-4 border-orange-500">
             <p class="text-gray-400 text-sm">Temperature</p>
-            <h2 id="txt-suhu" class="text-4xl font-bold">0.0 <span class="text-sm text-orange-400">°C</span></h2>
+            <h2 id="txt-suhu" class="text-3xl font-bold">0.0</h2><p class="text-xs text-orange-400">°Celsius</p>
         </div>
         <div class="glass-card p-6 border-l-4 border-blue-500">
             <p class="text-gray-400 text-sm">Humidity</p>
-            <h2 id="txt-kelembapan" class="text-4xl font-bold">0 <span class="text-sm text-blue-400">%</span></h2>
+            <h2 id="txt-kelembapan" class="text-3xl font-bold">0</h2><p class="text-xs text-blue-400">% RH</p>
         </div>
-        <div class="glass-card p-6 border-l-4 border-purple-500">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-gray-400 text-xs">Relay Status:</span>
-                <span id="txt-relay-status" class="text-xs font-bold text-green-400">L:OFF | K:OFF</span>
-            </div>
-            <div class="flex justify-between items-center">
-                <span class="text-gray-400 text-xs">Servo Angle:</span>
-                <span id="txt-status-servo" class="text-sm font-bold text-purple-400">0° <i id="icon-servo" class="fas fa-sync-alt ml-1"></i></span>
-            </div>
+        <div class="glass-card p-6 border-l-4 border-green-500">
+            <p class="text-gray-400 text-sm">Actuators</p>
+            <h2 id="txt-status-all" class="text-sm font-bold text-green-400">L: OFF | K: OFF</h2>
         </div>
     </div>
 
-    <div class="glass-card p-6 mb-8">
-        <canvas id="iotChart" height="100"></canvas>
+    <div class="glass-card p-6 mb-8"><canvas id="iotChart" height="80"></canvas></div>
+
+    <div class="glass-card p-6 overflow-hidden">
+        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm">Hatching Logs</h3>
+        <div class="max-h-60 overflow-y-auto">
+            <table class="w-full text-left text-xs">
+                <thead class="text-gray-400 uppercase sticky top-0 bg-[#0f111a]">
+                    <tr><th class="p-4">Timestamp</th><th class="p-4">Temp</th><th class="p-4">Humid</th><th class="p-4">Servo</th><th class="p-4">Actuators</th></tr>
+                </thead>
+                <tbody id="log-table-body"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // Inisialisasi Firebase & Chart sama seperti sebelumnya...
         const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        let isRunning = false; let logData = []; let pollingTimer = null;
+        const ctx = document.getElementById('iotChart').getContext('2d');
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [
+                { label: 'Temp', data: [], borderColor: '#f97316', tension: 0.4 },
+                { label: 'Humid', data: [], borderColor: '#3b82f6', tension: 0.4 }
+            ]},
+            options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } } } }
+        });
+
+        function setFan(val) { db.ref("pengaturan").update({ kipasManual: val }); }
+        function setLamp(val) { db.ref("pengaturan").update({ lampuManual: val }); }
+
         function fetchData() {
+            if (!isRunning) return;
             db.ref("monitoring").once("value").then((snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    document.getElementById("txt-suhu").innerText = parseFloat(data.suhu).toFixed(1);
-                    document.getElementById("txt-kelembapan").innerText = data.kelembapan;
-                    document.getElementById("txt-relay-status").innerText = `L:${data.statusLampu} | K:${data.statusKipas}`;
-                    
+                    const s = parseFloat(data.suhu || 0).toFixed(1);
+                    const k = parseFloat(data.kelembapan || 0).toFixed(0);
+                    const sk = data.statusKipas || "OFF";
+                    const sl = data.statusLampu || "OFF";
                     const sv = data.sudutServo || 0;
+                    const wkt = new Date().toLocaleTimeString('id-ID');
+
+                    document.getElementById("txt-suhu").innerText = s;
+                    document.getElementById("txt-kelembapan").innerText = k;
+                    document.getElementById("txt-status-all").innerText = `L: ${sl} | K: ${sk}`;
+                    
                     const servoTxt = document.getElementById("txt-status-servo");
                     const servoIcon = document.getElementById("icon-servo");
-                    
                     servoTxt.innerText = sv + "°";
-                    if(sv == 90) {
-                        servoTxt.classList.add("text-yellow-400");
-                        servoIcon.classList.add("fa-spin");
-                    } else {
-                        servoTxt.classList.remove("text-yellow-400");
-                        servoIcon.classList.remove("fa-spin");
-                    }
+                    sv == 90 ? servoIcon.classList.add("fa-spin") : servoIcon.classList.remove("fa-spin");
+
+                    logData.push({ waktu: new Date().toLocaleString(), s, k, sv, act: `L:${sl} K:${sk}` });
+                    if (myChart.data.labels.length > 15) { myChart.data.labels.shift(); myChart.data.datasets[0].data.shift(); myChart.data.datasets[1].data.shift(); }
+                    myChart.data.labels.push(wkt); myChart.data.datasets[0].data.push(s); myChart.data.datasets[1].data.push(k); myChart.update('none');
+
+                    const newRow = `<tr><td class="p-4 text-gray-400">${new Date().toLocaleString()}</td><td class="p-4 text-orange-400">${s}°C</td><td class="p-4 text-blue-400">${k}%</td><td class="p-4 text-purple-400">${sv}°</td><td class="p-4"><span class="status-badge bg-white/5">${sl}|${sk}</span></td></tr>`;
+                    document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', newRow);
                 }
             });
         }
-        setInterval(fetchData, 2000);
+
+        db.ref("pengaturan").on("value", (snap) => {
+            const settings = snap.val(); if(!settings) return;
+            isRunning = settings.running;
+            document.getElementById("conn-stat").innerText = isRunning ? "MONITORING" : "STANDBY";
+            document.getElementById("fan-mode-status").innerText = "Mode: " + (settings.kipasManual == 1 ? "FORCE ON" : settings.kipasManual == 0 ? "FORCE OFF" : "AUTO");
+            document.getElementById("lamp-mode-status").innerText = "Mode: " + (settings.lampuManual == 1 ? "FORCE ON" : settings.lampuManual == 0 ? "FORCE OFF" : "AUTO");
+            if (pollingTimer) clearInterval(pollingTimer);
+            if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
+        });
+
+        function startMonitoring() { db.ref("pengaturan").update({ running: true, interval: parseInt(document.getElementById("intervalInput").value || 5) }); }
+        function stopMonitoring() { db.ref("pengaturan/running").set(false); }
+        function downloadCSV() {
+            let csv = "Timestamp,Temp,Humidity,Servo,Actuators\n";
+            logData.forEach(r => { csv += `${r.waktu},${r.s},${r.k},${r.sv},${r.act}\n` });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'Data_Penetas.csv'; a.click();
+        }
         setInterval(() => { document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); }, 1000);
     </script>
 </body>
