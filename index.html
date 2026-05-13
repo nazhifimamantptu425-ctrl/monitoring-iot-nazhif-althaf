@@ -110,7 +110,7 @@
         </div>
     </div>
 
-    <!-- MAIN MONITORING CARDS -->
+    <!-- MONITORING CARDS -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
         <div class="glass-card p-6 border-l-4 border-orange-500">
             <p class="text-gray-400 text-sm">Temperature</p>
@@ -133,7 +133,7 @@
 
     <!-- LOGS TABLE -->
     <div class="glass-card p-6">
-        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm flex items-center gap-2"><i class="fas fa-history"></i> HATCHING LOGS & MOVEMENT</h3>
+        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm flex items-center gap-2"><i class="fas fa-history"></i> HATCHING LOGS</h3>
         <div class="max-h-72 overflow-y-auto pr-2">
             <table class="w-full text-left text-[11px]">
                 <thead class="text-gray-400 uppercase sticky top-0 bg-[#1a1d2b] shadow-sm">
@@ -150,18 +150,21 @@
     </div>
 
     <script>
-        // CONFIG FIREBASE
+        // 1. INISIALISASI FIREBASE
         const firebaseConfig = { databaseURL: "https://monitoring-nazhif-dan-althaf-default-rtdb.asia-southeast1.firebasedatabase.app/" };
-        firebase.initializeApp(firebaseConfig);
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.database();
 
+        // 2. VARIABEL GLOBAL
         let isRunning = false; 
         let logData = []; 
         let pollingTimer = null;
         let lastServoPos = -1; 
         let posStartTime = Date.now();
 
-        // CHART CONFIG
+        // 3. CHART CONFIG
         const ctx = document.getElementById('iotChart').getContext('2d');
         const myChart = new Chart(ctx, {
             type: 'line',
@@ -172,21 +175,30 @@
             options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
         });
 
-        // CONTROL FUNCTIONS
-        function setFan(val) { db.ref("pengaturan").update({ kipasManual: val }); }
-        function setLamp(val) { db.ref("pengaturan").update({ lampuManual: val }); }
+        // 4. FUNGSI KONTROL (ON/OFF/AUTO)
+        function setFan(val) {
+            console.log("Mengubah Fan ke:", val);
+            db.ref("pengaturan").update({ kipasManual: parseInt(val) })
+                .catch(err => alert("Gagal update kipas: " + err));
+        }
+
+        function setLamp(val) {
+            console.log("Mengubah Lampu ke:", val);
+            db.ref("pengaturan").update({ lampuManual: parseInt(val) })
+                .catch(err => alert("Gagal update lampu: " + err));
+        }
         
         function updateServoInterval() {
             const menit = document.getElementById("servoIntervalInput").value;
             if (menit && menit > 0) {
                 db.ref("pengaturan").update({ intervalServoMenit: parseInt(menit) })
-                    .then(() => alert("Jeda putar servo diatur ke " + menit + " menit"));
+                    .then(() => alert("Jeda putar servo berhasil diatur!"));
             } else {
-                alert("Masukkan angka menit yang valid!");
+                alert("Masukkan angka menit!");
             }
         }
 
-        // FETCH DATA LOGIC
+        // 5. FETCH DATA LOGIC
         function fetchData() {
             if (!isRunning) return;
             db.ref("monitoring").once("value").then((snapshot) => {
@@ -209,7 +221,6 @@
                     let colorClass = (sv == 90) ? "text-yellow-400 animate-flicker" : "text-purple-400";
                     let ketTeks = (sv == 90) ? `Sedang memutar telur...` : `Posisi standby menit ke-${durationMin}`;
 
-                    // Update UI Elements
                     document.getElementById("txt-suhu").innerText = s + "°C";
                     document.getElementById("txt-kelembapan").innerText = k + "%";
                     document.getElementById("txt-status-act").innerText = `L: ${sl} | K: ${sk}`;
@@ -218,7 +229,6 @@
                     document.getElementById("txt-servo-timer").innerText = `Waktu status ini: ${durationMin} menit`;
                     document.getElementById("txt-sudut-raw").innerText = sv + "°";
 
-                    // Update Chart
                     if (myChart.data.labels.length > 15) { 
                         myChart.data.labels.shift(); 
                         myChart.data.datasets[0].data.shift(); 
@@ -229,7 +239,6 @@
                     myChart.data.datasets[1].data.push(k); 
                     myChart.update('none');
 
-                    // Add to Table
                     logData.push({ t: new Date().toLocaleString(), s, k, sv, st: statusTeks, d: durationMin });
                     const newRow = `
                         <tr class="border-b border-white/5 hover:bg-white/5 transition">
@@ -243,7 +252,7 @@
             });
         }
 
-        // SETTINGS LISTENER
+        // 6. SYSTEM LISTENERS & BUTTONS
         db.ref("pengaturan").on("value", (snap) => {
             const settings = snap.val(); if(!settings) return;
             isRunning = settings.running;
@@ -259,23 +268,23 @@
             if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
         });
 
-        // SYSTEM BUTTONS
         function startMonitoring() { 
-            isRunning = true;
             const val = document.getElementById("intervalInput").value || 5;
-            db.ref("pengaturan").update({ running: true, interval: parseInt(val) }).then(() => { fetchData(); });
+            db.ref("pengaturan").update({ running: true, interval: parseInt(val) });
         }
-        function stopMonitoring() { isRunning = false; db.ref("pengaturan/running").set(false); }
+        
+        function stopMonitoring() { 
+            db.ref("pengaturan").update({ running: false }); 
+        }
         
         function downloadCSV() {
-            let csv = "Timestamp,Temp,Humid,Servo,Duration(Min)\n";
+            let csv = "Timestamp,Temp,Humid,ServoStatus,Duration(Min)\n";
             logData.forEach(r => { csv += `${r.t},${r.s},${r.k},${r.st},${r.d}\n` });
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = 'Log_Inkubator.csv'; a.click();
         }
 
-        // CLOCK
         setInterval(() => { document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); }, 1000);
     </script>
 </body>
