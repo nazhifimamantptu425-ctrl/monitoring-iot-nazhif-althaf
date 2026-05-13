@@ -15,8 +15,6 @@
         .btn-gradient { background: linear-gradient(90deg, #f59e0b 0%, #d97706 100%); transition: 0.3s; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .animate-flicker { animation: flicker 1.5s infinite; }
-        @keyframes flicker { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .btn-active-red { background-color: #ef4444 !important; box-shadow: 0 0 10px #ef4444; }
         .btn-active-blue { background-color: #3b82f6 !important; box-shadow: 0 0 10px #3b82f6; }
         .btn-active-orange { background-color: #f97316 !important; box-shadow: 0 0 10px #f97316; }
@@ -79,22 +77,20 @@
                     <div class="bg-white/5 p-3 rounded-xl border border-white/5">
                         <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Mekanisme Rak Telur:</p>
                         <p id="txt-status-servo-main" class="text-purple-400 font-bold text-lg italic">DIAM/JEDA (0°)</p>
-                        <p id="txt-servo-timer" class="text-[10px] text-gray-500 italic">Waktu status ini: 0 menit</p>
+                        <p id="txt-servo-timer" class="text-[10px] text-gray-500 italic">Durasi posisi ini: 0 menit</p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">
-                        <!-- Fan Control -->
                         <div class="text-center">
-                            <p class="text-[9px] text-gray-500 uppercase mb-1">Fan: <span id="lbl-fan" class="text-white">-</span></p>
+                            <p class="text-[9px] text-gray-500 uppercase mb-1">Fan Control: <span id="lbl-fan" class="text-white">-</span></p>
                             <div class="grid grid-cols-3 gap-1">
                                 <button id="btn-fan-1" onclick="setFan(1)" class="bg-slate-700 p-1 rounded text-[8px] font-bold">ON</button>
                                 <button id="btn-fan-0" onclick="setFan(0)" class="bg-slate-700 p-1 rounded text-[8px] font-bold">OFF</button>
                                 <button id="btn-fan-2" onclick="setFan(2)" class="bg-slate-700 p-1 rounded text-[8px] font-bold">AUTO</button>
                             </div>
                         </div>
-                        <!-- Lamp Control -->
                         <div class="text-center">
-                            <p class="text-[9px] text-gray-500 uppercase mb-1">Lamp: <span id="lbl-lamp" class="text-white">-</span></p>
+                            <p class="text-[9px] text-gray-500 uppercase mb-1">Lamp Control: <span id="lbl-lamp" class="text-white">-</span></p>
                             <div class="grid grid-cols-3 gap-1">
                                 <button id="btn-lamp-1" onclick="setLamp(1)" class="bg-slate-700 p-1 rounded text-[8px] font-bold">ON</button>
                                 <button id="btn-lamp-0" onclick="setLamp(0)" class="bg-slate-700 p-1 rounded text-[8px] font-bold">OFF</button>
@@ -103,7 +99,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </div>
 
@@ -149,7 +144,7 @@
                         <th class="p-4">Timestamp</th>
                         <th class="p-4">Suhu/Humid</th>
                         <th class="p-4">Status Servo</th>
-                        <th class="p-4">Keterangan</th>
+                        <th class="p-4">Keterangan Actuator</th>
                     </tr>
                 </thead>
                 <tbody id="log-table-body"></tbody>
@@ -175,8 +170,8 @@
         const myChart = new Chart(ctx, {
             type: 'line',
             data: { labels: [], datasets: [
-                { label: 'Temp', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
-                { label: 'Humid', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }
+                { label: 'Temp (°C)', data: [], borderColor: '#f97316', backgroundColor: 'rgba(249, 115, 22, 0.1)', fill: true, tension: 0.4 },
+                { label: 'Humid (%)', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.4 }
             ]},
             options: { responsive: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } } }
         });
@@ -189,7 +184,7 @@
             const menit = document.getElementById("servoIntervalInput").value;
             if (menit > 0) {
                 db.ref("pengaturan").update({ intervalServoMenit: parseInt(menit) })
-                  .then(() => alert("Interval berhasil diupdate!"));
+                  .then(() => alert("Interval Servo Diperbarui!"));
             }
         }
 
@@ -206,12 +201,10 @@
             const modes = ["OFF", "ON", "AUTO"];
             label.innerText = modes[value];
 
-            // Reset semua tombol di grup tersebut
             for (let i = 0; i <= 2; i++) {
                 document.getElementById(`btn-${type}-${i}`).className = "bg-slate-700 p-1 rounded text-[8px] font-bold";
             }
 
-            // Aktifkan tombol yang sesuai
             const btn = document.getElementById(`btn-${type}-${value}`);
             if (value === 0) btn.className += " btn-active-red";
             else if (value === 1) btn.className += (type === 'fan' ? " btn-active-blue" : " btn-active-orange");
@@ -243,15 +236,29 @@
                 const s = parseFloat(data.suhu || 0).toFixed(1);
                 const k = parseFloat(data.kelembapan || 0).toFixed(0);
                 const sv = data.sudutServo || 0;
+                const sl = data.statusLampu || "OFF";
+                const sk = data.statusKipas || "OFF";
                 const wkt = new Date().toLocaleTimeString('id-ID');
 
                 if (sv !== lastServoPos) { lastServoPos = sv; posStartTime = Date.now(); }
                 let durationMin = Math.floor((Date.now() - posStartTime) / 60000);
                 
+                // Update UI
                 document.getElementById("txt-suhu").innerText = s + "°C";
                 document.getElementById("txt-kelembapan").innerText = k + "%";
-                document.getElementById("txt-status-act").innerText = `L: ${data.statusLampu} | K: ${data.statusKipas}`;
+                document.getElementById("txt-status-act").innerText = `L: ${sl} | K: ${sk}`;
                 document.getElementById("txt-sudut-raw").innerText = sv + "°";
+
+                // Servo Status UI
+                const servoLabel = document.getElementById("txt-status-servo-main");
+                if (sv > 0) {
+                    servoLabel.innerText = `PROSES PUTAR (${sv}°)`;
+                    servoLabel.className = "text-orange-400 font-bold text-lg italic animate-pulse";
+                } else {
+                    servoLabel.innerText = `DIAM/JEDA (0°)`;
+                    servoLabel.className = "text-purple-400 font-bold text-lg italic";
+                }
+                document.getElementById("txt-servo-timer").innerText = `Durasi posisi ini: ${durationMin} menit`;
 
                 // Update Chart
                 if (myChart.data.labels.length > 15) { 
@@ -265,21 +272,35 @@
                 myChart.update('none');
 
                 // Table Log
-                const row = `<tr class="border-b border-white/5"><td class="p-4 text-gray-400">${wkt}</td><td class="p-4">${s}°C / ${k}%</td><td class="p-4 font-bold text-purple-400">${sv}°</td><td class="p-4 italic text-gray-500">Minit ke-${durationMin}</td></tr>`;
-                document.getElementById("log-table-body").insertAdjacentHTML('afterbegin', row);
-                logData.push({ t: wkt, s, k, sv, d: durationMin });
+                const logTable = document.getElementById("log-table-body");
+                const row = `
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                        <td class="p-4 text-gray-400">${wkt}</td>
+                        <td class="p-4 font-mono ${s > 38 ? 'text-red-400' : 'text-green-400'}">${s}°C / ${k}%</td>
+                        <td class="p-4 font-bold text-purple-400">${sv}°</td>
+                        <td class="p-4 text-[10px]">
+                            <span class="px-2 py-1 rounded bg-white/5">L:${sl}</span> 
+                            <span class="px-2 py-1 rounded bg-white/5">K:${sk}</span>
+                        </td>
+                    </tr>`;
+                logTable.insertAdjacentHTML('afterbegin', row);
+                if (logTable.children.length > 50) logTable.lastElementChild.remove();
+
+                logData.push({ t: wkt, s, k, sv, sl, sk });
             });
         }
 
         function downloadCSV() {
-            let csv = "Time,Temp,Humid,ServoAngle\n";
-            logData.forEach(r => csv += `${r.t},${r.s},${r.k},${r.sv}\n`);
+            let csv = "Time,Temp,Humid,ServoAngle,Lamp,Fan\n";
+            logData.forEach(r => csv += `${r.t},${r.s},${r.k},${r.sv},${r.sl},${r.sk}\n`);
             const blob = new Blob([csv], { type: 'text/csv' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'log_inkubator.csv'; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = 'log_inkubator_nazhif.csv'; a.click();
         }
 
-        setInterval(() => { document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); }, 1000);
+        setInterval(() => { 
+            document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); 
+        }, 1000);
     </script>
 </body>
 </html>
