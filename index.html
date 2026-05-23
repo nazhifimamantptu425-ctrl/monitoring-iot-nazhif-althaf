@@ -24,7 +24,6 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <!-- HEADER SECTION -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
         <div>
             <h1 class="text-3xl font-bold italic text-yellow-500"><i class="fas fa-egg mr-2"></i>PENETAS TELUR <span class="text-white font-light text-sm ml-2 italic">Smart Incubator</span></h1>
@@ -32,7 +31,7 @@
         </div>
         <div class="flex items-center gap-4">
             <button onclick="downloadCSV()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition shadow-lg">
-                <i class="fas fa-file-download"></i> DOWNLOAD DATA
+                <i class="fas fa-file-download"></i> DOWNLOAD DATA HISTORI
             </button>
             <div class="flex items-center gap-4 glass-card p-3">
                 <div class="text-right">
@@ -46,13 +45,11 @@
         </div>
     </div>
 
-    <!-- CONTROL PANEL & DEVICE INFO -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div class="lg:col-span-2 glass-card p-6">
             <h3 class="font-bold mb-4 flex items-center gap-2 text-yellow-500"><i class="fas fa-sliders-h"></i> CONTROL PANEL</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                <!-- System Config -->
                 <div class="space-y-4 border-r border-white/5 pr-4">
                     <p class="text-gray-400 text-[10px] italic underline">Configuration:</p>
                     <div>
@@ -72,7 +69,6 @@
                     </div>
                 </div>
 
-                <!-- Actuator Modes -->
                 <div class="space-y-4">
                     <div class="bg-white/5 p-3 rounded-xl border border-white/5">
                         <p class="text-gray-400 text-[10px] uppercase tracking-wider mb-1">Mekanisme Rak Telur:</p>
@@ -102,18 +98,16 @@
             </div>
         </div>
 
-        <!-- DEVICE INFO -->
         <div class="glass-card p-6 flex flex-col justify-center text-sm">
             <h3 class="font-bold mb-4 text-blue-400"><i class="fas fa-network-wired mr-2"></i>DEVICE INFO</h3>
             <div class="space-y-3">
                 <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">System</span><span id="conn-stat" class="text-yellow-400 font-bold italic text-xs">STANDBY</span></div>
                 <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Angle Raw</span><span id="txt-sudut-raw" class="font-bold">0°</span></div>
-                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Heartbeat</span><span class="text-green-500 animate-pulse">● ONLINE</span></div>
+                <div class="flex justify-between border-b border-white/5 pb-1"><span class="text-gray-400">Heartbeat</span><span id="txt-heartbeat" class="text-red-500">● OFFLINE</span></div>
             </div>
         </div>
     </div>
 
-    <!-- MONITORING CARDS -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 text-center">
         <div class="glass-card p-6 border-l-4 border-orange-500">
             <p class="text-gray-400 text-sm">Temperature</p>
@@ -129,25 +123,25 @@
         </div>
     </div>
 
-    <!-- CHART AREA -->
     <div class="glass-card p-6 mb-8">
         <canvas id="iotChart" height="80"></canvas>
     </div>
 
-    <!-- LOGS TABLE -->
     <div class="glass-card p-6">
-        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm flex items-center gap-2"><i class="fas fa-history"></i> HATCHING LOGS</h3>
+        <h3 class="font-bold mb-4 italic text-yellow-500 text-sm flex items-center gap-2"><i class="fas fa-history"></i> AUTOMATIC HATCHING LOGS (PER 10 MENIT)</h3>
         <div class="max-h-72 overflow-y-auto pr-2">
             <table class="w-full text-left text-[11px]">
                 <thead class="text-gray-400 uppercase sticky top-0 bg-[#1a1d2b] shadow-sm">
                     <tr>
-                        <th class="p-4">Timestamp</th>
+                        <th class="p-4">Urutan Data</th>
                         <th class="p-4">Suhu/Humid</th>
                         <th class="p-4">Status Servo</th>
                         <th class="p-4">Keterangan Actuator</th>
                     </tr>
                 </thead>
-                <tbody id="log-table-body"></tbody>
+                <tbody id="log-table-body">
+                    <tr><td colspan="4" class="text-center p-4 text-gray-500">Menunggu sinkronisasi cloud...</td></tr>
+                </tbody>
             </table>
         </div>
     </div>
@@ -160,10 +154,11 @@
 
         // --- 2. GLOBAL VARIABLES ---
         let isRunning = false;
-        let logData = [];
+        let logData = []; // Menampung riwayat permanen dari cloud
         let pollingTimer = null;
         let lastServoPos = -1;
         let posStartTime = Date.now();
+        let lastFirebaseTimestamp = 0;
 
         // --- 3. CHART SETUP ---
         const ctx = document.getElementById('iotChart').getContext('2d');
@@ -199,19 +194,22 @@
         function updateActuatorUI(type, value) {
             const label = document.getElementById(`lbl-${type}`);
             const modes = ["OFF", "ON", "AUTO"];
-            label.innerText = modes[value];
+            label.innerText = modes[value] || "OFF";
 
             for (let i = 0; i <= 2; i++) {
-                document.getElementById(`btn-${type}-${i}`).className = "bg-slate-700 p-1 rounded text-[8px] font-bold";
+                const btnNode = document.getElementById(`btn-${type}-${i}`);
+                if(btnNode) btnNode.className = "bg-slate-700 p-1 rounded text-[8px] font-bold";
             }
 
             const btn = document.getElementById(`btn-${type}-${value}`);
-            if (value === 0) btn.className += " btn-active-red";
-            else if (value === 1) btn.className += (type === 'fan' ? " btn-active-blue" : " btn-active-orange");
-            else if (value === 2) btn.className += (type === 'fan' ? " btn-active-purple" : " btn-active-yellow");
+            if (btn) {
+                if (value === 0) btn.className += " btn-active-red";
+                else if (value === 1) btn.className += (type === 'fan' ? " btn-active-blue" : " btn-active-orange");
+                else if (value === 2) btn.className += (type === 'fan' ? " btn-active-purple" : " btn-active-yellow");
+            }
         }
 
-        // --- 6. REALTIME LISTENERS ---
+        // --- 6. REALTIME LISTENERS (Sistem Web & Saklar) ---
         db.ref("pengaturan").on("value", (snap) => {
             const settings = snap.val();
             if (!settings) return;
@@ -227,6 +225,7 @@
             if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
         });
 
+        // --- 7. LIVE DATA MONITORING (Setiap Sekian Detik) ---
         function fetchData() {
             if (!isRunning) return;
             db.ref("monitoring").once("value").then((snapshot) => {
@@ -240,16 +239,21 @@
                 const sk = data.statusKipas || "OFF";
                 const wkt = new Date().toLocaleTimeString('id-ID');
 
+                // Deteksi Heartbeat (Apakah ESP32 aktif mengirim data?)
+                lastFirebaseTimestamp = Date.now();
+                document.getElementById("txt-heartbeat").innerText = "● ONLINE";
+                document.getElementById("txt-heartbeat").className = "text-green-500 animate-pulse";
+
                 if (sv !== lastServoPos) { lastServoPos = sv; posStartTime = Date.now(); }
                 let durationMin = Math.floor((Date.now() - posStartTime) / 60000);
                 
-                // Update UI
+                // Update UI Utama
                 document.getElementById("txt-suhu").innerText = s + "°C";
                 document.getElementById("txt-kelembapan").innerText = k + "%";
                 document.getElementById("txt-status-act").innerText = `L: ${sl} | K: ${sk}`;
                 document.getElementById("txt-sudut-raw").innerText = sv + "°";
 
-                // Servo Status UI
+                // Servo UI Status
                 const servoLabel = document.getElementById("txt-status-servo-main");
                 if (sv > 0) {
                     servoLabel.innerText = `PROSES PUTAR (${sv}°)`;
@@ -260,7 +264,7 @@
                 }
                 document.getElementById("txt-servo-timer").innerText = `Durasi posisi ini: ${durationMin} menit`;
 
-                // Update Chart
+                // Update Grafik Live
                 if (myChart.data.labels.length > 15) { 
                     myChart.data.labels.shift(); 
                     myChart.data.datasets[0].data.shift(); 
@@ -270,34 +274,74 @@
                 myChart.data.datasets[0].data.push(s);
                 myChart.data.datasets[1].data.push(k);
                 myChart.update('none');
-
-                // Table Log
-                const logTable = document.getElementById("log-table-body");
-                const row = `
-                    <tr class="border-b border-white/5 hover:bg-white/5 transition">
-                        <td class="p-4 text-gray-400">${wkt}</td>
-                        <td class="p-4 font-mono ${s > 38 ? 'text-red-400' : 'text-green-400'}">${s}°C / ${k}%</td>
-                        <td class="p-4 font-bold text-purple-400">${sv}°</td>
-                        <td class="p-4 text-[10px]">
-                            <span class="px-2 py-1 rounded bg-white/5">L:${sl}</span> 
-                            <span class="px-2 py-1 rounded bg-white/5">K:${sk}</span>
-                        </td>
-                    </tr>`;
-                logTable.insertAdjacentHTML('afterbegin', row);
-                if (logTable.children.length > 50) logTable.lastElementChild.remove();
-
-                logData.push({ t: wkt, s, k, sv, sl, sk });
             });
         }
 
+        // --- 8. DATABASE HISTORI LISTENER (Membaca Data Masa Lalu Jarak Jauh) ---
+        db.ref("hatching_logs").on("value", (snapshot) => {
+            const logs = snapshot.val();
+            const logTable = document.getElementById("log-table-body");
+            logTable.innerHTML = "";
+            logData = []; // Reset penampung data unduh
+
+            if (!logs) {
+                logTable.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">Belum ada data otomatis terekam di cloud.</td></tr>`;
+                return;
+            }
+
+            let index = 1;
+            // Loop data dari database, urutkan agar yang terbaru berada di urutan paling atas
+            Object.keys(logs).forEach((key) => {
+                const item = logs[key];
+                const labelUrutan = `Data Riwayat ke-${index++}`;
+
+                const row = `
+                    <tr class="border-b border-white/5 hover:bg-white/5 transition">
+                        <td class="p-4 text-gray-400 font-semibold">${labelUrutan}</td>
+                        <td class="p-4 font-mono ${item.suhu > 38 ? 'text-red-400' : 'text-green-400'}">${parseFloat(item.suhu).toFixed(1)}°C / ${parseInt(item.kelembapan)}%</td>
+                        <td class="p-4 font-bold text-purple-400">${item.sudutServo}°</td>
+                        <td class="p-4 text-[10px]">
+                            <span class="px-2 py-1 rounded bg-white/5">L:${item.statusLampu}</span> 
+                            <span class="px-2 py-1 rounded bg-white/5">K:${item.statusKipas}</span>
+                        </td>
+                    </tr>`;
+                
+                logTable.insertAdjacentHTML('afterbegin', row);
+                
+                // Masukkan ke array global untuk fitur unduh CSV
+                logData.push({ id: labelUrutan, s: item.suhu, k: item.kelembapan, sv: item.sudutServo, sl: item.statusLampu, sk: item.statusKipas });
+            });
+        });
+
+        // --- 9. CEK DIAGNOSIS HEARTBEAT DEVICE ---
+        setInterval(() => {
+            // Jika dalam 15 detik data live database tidak merespon, set status OFFLINE
+            if (Date.now() - lastFirebaseTimestamp > 15000 && isRunning) {
+                document.getElementById("txt-heartbeat").innerText = "● OFFLINE (LAG)";
+                document.getElementById("txt-heartbeat").className = "text-red-500 font-bold";
+            }
+        }, 5000);
+
+        // --- 10. DOWNLOAD HISTORI MENJADI FILE EXCEL (CSV) ---
         function downloadCSV() {
-            let csv = "Time,Temp,Humid,ServoAngle,Lamp,Fan\n";
-            logData.forEach(r => csv += `${r.t},${r.s},${r.k},${r.sv},${r.sl},${r.sk}\n`);
-            const blob = new Blob([csv], { type: 'text/csv' });
+            if (logData.length === 0) {
+                alert("Tidak ada data histori di cloud untuk diunduh!");
+                return;
+            }
+            let csv = "Urutan Data,Suhu (C),Kelembapan (%),Sudut Servo,Status Lampu,Status Kipas\n";
+            // Balik urutan array agar di Excel tersusun dari data paling lama ke paling baru
+            [...logData].reverse().forEach(r => {
+                csv += `${r.id},${r.s},${r.k},${r.sv},${r.sl},${r.sk}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = 'log_inkubator_nazhif.csv'; a.click();
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'riwayat_inkubator_bebek.csv';
+            a.click();
         }
 
+        // Jam Digital Atas
         setInterval(() => { 
             document.getElementById('digital-clock').innerText = new Date().toLocaleTimeString('id-ID'); 
         }, 1000);
