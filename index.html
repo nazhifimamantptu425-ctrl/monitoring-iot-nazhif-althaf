@@ -133,7 +133,7 @@
             <table class="w-full text-left text-[11px]">
                 <thead class="text-gray-400 uppercase sticky top-0 bg-[#1a1d2b] shadow-sm">
                     <tr>
-                        <th class="p-4">Urutan Data</th>
+                        <th class="p-4">Tanggal & Waktu (WIB)</th>
                         <th class="p-4">Suhu/Humid</th>
                         <th class="p-4">Status Servo</th>
                         <th class="p-4">Keterangan Actuator</th>
@@ -154,7 +154,7 @@
 
         // --- 2. GLOBAL VARIABLES ---
         let isRunning = false;
-        let logData = []; // Menampung riwayat permanen dari cloud
+        let logData = []; 
         let pollingTimer = null;
         let lastServoPos = -1;
         let posStartTime = Date.now();
@@ -190,7 +190,7 @@
 
         function stopMonitoring() { db.ref("pengaturan").update({ running: false }); }
 
-        // --- 5. UI UPDATER (Buttons & Labels) ---
+        // --- 5. UI UPDATER ---
         function updateActuatorUI(type, value) {
             const label = document.getElementById(`lbl-${type}`);
             const modes = ["OFF", "ON", "AUTO"];
@@ -209,7 +209,7 @@
             }
         }
 
-        // --- 6. REALTIME LISTENERS (Sistem Web & Saklar) ---
+        // --- 6. REALTIME LISTENERS ---
         db.ref("pengaturan").on("value", (snap) => {
             const settings = snap.val();
             if (!settings) return;
@@ -225,7 +225,7 @@
             if (isRunning) pollingTimer = setInterval(fetchData, (settings.interval || 5) * 1000);
         });
 
-        // --- 7. LIVE DATA MONITORING (Setiap Sekian Detik) ---
+        // --- 7. LIVE DATA MONITORING ---
         function fetchData() {
             if (!isRunning) return;
             db.ref("monitoring").once("value").then((snapshot) => {
@@ -239,7 +239,6 @@
                 const sk = data.statusKipas || "OFF";
                 const wkt = new Date().toLocaleTimeString('id-ID');
 
-                // Deteksi Heartbeat (Apakah ESP32 aktif mengirim data?)
                 lastFirebaseTimestamp = Date.now();
                 document.getElementById("txt-heartbeat").innerText = "● ONLINE";
                 document.getElementById("txt-heartbeat").className = "text-green-500 animate-pulse";
@@ -247,13 +246,11 @@
                 if (sv !== lastServoPos) { lastServoPos = sv; posStartTime = Date.now(); }
                 let durationMin = Math.floor((Date.now() - posStartTime) / 60000);
                 
-                // Update UI Utama
                 document.getElementById("txt-suhu").innerText = s + "°C";
                 document.getElementById("txt-kelembapan").innerText = k + "%";
                 document.getElementById("txt-status-act").innerText = `L: ${sl} | K: ${sk}`;
                 document.getElementById("txt-sudut-raw").innerText = sv + "°";
 
-                // Servo UI Status
                 const servoLabel = document.getElementById("txt-status-servo-main");
                 if (sv > 0) {
                     servoLabel.innerText = `PROSES PUTAR (${sv}°)`;
@@ -264,7 +261,6 @@
                 }
                 document.getElementById("txt-servo-timer").innerText = `Durasi posisi ini: ${durationMin} menit`;
 
-                // Update Grafik Live
                 if (myChart.data.labels.length > 15) { 
                     myChart.data.labels.shift(); 
                     myChart.data.datasets[0].data.shift(); 
@@ -277,27 +273,33 @@
             });
         }
 
-        // --- 8. DATABASE HISTORI LISTENER (Membaca Data Masa Lalu Jarak Jauh) ---
+        // --- 8. DATABASE HISTORI LISTENER (Membaca Angka Waktu dan Konversi Format) ---
         db.ref("hatching_logs").on("value", (snapshot) => {
             const logs = snapshot.val();
             const logTable = document.getElementById("log-table-body");
             logTable.innerHTML = "";
-            logData = []; // Reset penampung data unduh
+            logData = []; 
 
             if (!logs) {
                 logTable.innerHTML = `<tr><td colspan="4" class="text-center p-4 text-gray-500">Belum ada data otomatis terekam di cloud.</td></tr>`;
                 return;
             }
 
-            let index = 1;
-            // Loop data dari database, urutkan agar yang terbaru berada di urutan paling atas
             Object.keys(logs).forEach((key) => {
                 const item = logs[key];
-                const labelUrutan = `Data Riwayat ke-${index++}`;
+                
+                // MENGUBAH ANGKA TIMESTAMP FIREBASE MENJADI TANGGAL & JAM WIB REAL
+                let waktuFormatLokal = "Tanpa Waktu";
+                if (item.timestamp) {
+                    waktuFormatLokal = new Date(item.timestamp).toLocaleString('id-ID', {
+                        timeZone: 'Asia/Jakarta',
+                        hour12: false
+                    });
+                }
 
                 const row = `
                     <tr class="border-b border-white/5 hover:bg-white/5 transition">
-                        <td class="p-4 text-gray-400 font-semibold">${labelUrutan}</td>
+                        <td class="p-4 text-gray-300 font-mono">${waktuFormatLokal}</td>
                         <td class="p-4 font-mono ${item.suhu > 38 ? 'text-red-400' : 'text-green-400'}">${parseFloat(item.suhu).toFixed(1)}°C / ${parseInt(item.kelembapan)}%</td>
                         <td class="p-4 font-bold text-purple-400">${item.sudutServo}°</td>
                         <td class="p-4 text-[10px]">
@@ -308,14 +310,12 @@
                 
                 logTable.insertAdjacentHTML('afterbegin', row);
                 
-                // Masukkan ke array global untuk fitur unduh CSV
-                logData.push({ id: labelUrutan, s: item.suhu, k: item.kelembapan, sv: item.sudutServo, sl: item.statusLampu, sk: item.statusKipas });
+                logData.push({ id: waktuFormatLokal, s: item.suhu, k: item.kelembapan, sv: item.sudutServo, sl: item.statusLampu, sk: item.statusKipas });
             });
         });
 
         // --- 9. CEK DIAGNOSIS HEARTBEAT DEVICE ---
         setInterval(() => {
-            // Jika dalam 15 detik data live database tidak merespon, set status OFFLINE
             if (Date.now() - lastFirebaseTimestamp > 15000 && isRunning) {
                 document.getElementById("txt-heartbeat").innerText = "● OFFLINE (LAG)";
                 document.getElementById("txt-heartbeat").className = "text-red-500 font-bold";
@@ -328,8 +328,7 @@
                 alert("Tidak ada data histori di cloud untuk diunduh!");
                 return;
             }
-            let csv = "Urutan Data,Suhu (C),Kelembapan (%),Sudut Servo,Status Lampu,Status Kipas\n";
-            // Balik urutan array agar di Excel tersusun dari data paling lama ke paling baru
+            let csv = "Tanggal dan Waktu (WIB),Suhu (C),Kelembapan (%),Sudut Servo,Status Lampu,Status Kipas\n";
             [...logData].reverse().forEach(r => {
                 csv += `${r.id},${r.s},${r.k},${r.sv},${r.sl},${r.sk}\n`;
             });
